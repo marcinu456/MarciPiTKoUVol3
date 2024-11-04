@@ -1,0 +1,8 @@
+The file structure is completely disintegrated and thus unreadable. 
+It needs to be split into appropriate subfolders, e.g. everything related to GAS should digest
+ into the GAS Folder, and then split into further subfolders when the C++ 
+ side of the system grows in time. The same is true for BluePrints where there 
+ is total chaos and there are still folders from the startup project. 
+ To start with, it is also best to separate things from the marketplace so that 
+ they do not mix with those created by the team. And, as in C++, all 
+ BPs from a given topic should go into the appropriate subfolders.

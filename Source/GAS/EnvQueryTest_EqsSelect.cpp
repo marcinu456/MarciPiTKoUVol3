@@ -73,6 +73,7 @@ void UEnvQueryTest_EqsSelect::RunTest(FEnvQueryInstance& QueryInstance) const
 	{
 		//get actor 
 		const AActor* ItemActor = GetItemActor(QueryInstance, It.GetIndex());
+		// Code review: [It is worth adding braces even for single-line blocks of code to increase readability and avoid potential errors]
 		if(!IsValid(ItemActor))
 			It.ForceItemState(EEnvItemStatus::Failed);
 		else
@@ -125,6 +126,8 @@ FText UEnvQueryTest_EqsSelect::GetDescriptionTitle() const
 	auto Tchar2 = *Fstring2;
 	auto Tchar3 = *Fstring3;
 	
+	//Code reviev [Might consider using FString directly instead of converting to TCHAR]
+
 	return FText::FromString(FString::Printf(TEXT("Compare key: %s with defualt value of %s : to %s"), 
 		Tchar1,
 		Tchar2,
