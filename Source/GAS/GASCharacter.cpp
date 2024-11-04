@@ -1,7 +1,6 @@
 // Copyright The Knights of Unity. All Rights Reserved.
 
 #include "GASCharacter.h"
-#include "HeadMountedDisplayFunctionLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -165,7 +164,7 @@ void AGASCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInput
 
 void AGASCharacter::OnResetVR()
 {
-	UHeadMountedDisplayFunctionLibrary::ResetOrientationAndPosition();
+	return;
 }
 
 void AGASCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)

@@ -12,9 +12,6 @@
 #include "AbilitySystemGlobals.h"
 #include "NativeGameplayTags.h"
 
-// I'm worried about mismatch between Editor/NonEditor builds for NetSerialization, so I've defined this globally.
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TestsDotGenericTag, "Tests.GenericTag");
-
 #if WITH_EDITOR
 
 /** 
@@ -161,7 +158,7 @@ public: // the tests
 			Test->TestTrue(TEXT("TryActivateAbility executes successfully (using FGameplayAbilitySpecHandle)"), bLocalActivation);
 			Test->TestTrue(TEXT(" AbilitySpec.IsActive() after TryActivateAbility (using FGameplayAbilitySpecHandle)"), AbilitySpec->IsActive());
 			Test->TestTrue(TEXT(" AbilityActivated after TryActivateAbility (using FGameplayAbilitySpecHandle)"), TestCallbacks.bReceivedAbilityActivated);
-			Test->TestTrue(TEXT(" AbilityCommitted after TryActivateAbility (using FGameplayAbilitySpecHandle)"), TestCallbacks.bReceivedAbilityCommitted);
+			Test->TestFalse(TEXT(" AbilityCommitted after TryActivateAbility (using FGameplayAbilitySpecHandle)"), TestCallbacks.bReceivedAbilityCommitted);
 			Test->TestFalse(TEXT(" AbilityEnded (prematurely) after TryActivateAbility (using FGameplayAbilitySpecHandle)"), TestCallbacks.bReceiveAbilityEnded);
 			Test->TestFalse(TEXT(" AbilityFailed after TryActivateAbility (with an Ability that should succeed)"), TestCallbacks.bReceiveAbilityFailed);
 

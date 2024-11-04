@@ -13,6 +13,7 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameplayTaskOwnerInterface.h"
 #include "Abilities/GameplayAbilityTargetTypes.h"
+#include "Net/Core/PushModel/PushModelMacros.h"
 #include "GameplayAbility.generated.h"
 
 class UAbilitySystemComponent;
@@ -107,6 +108,7 @@ UCLASS(Blueprintable)
 class GAMEPLAYABILITIES_API UGameplayAbility : public UObject, public IGameplayTaskOwnerInterface
 {
 	GENERATED_UCLASS_BODY()
+	REPLICATED_BASE_CLASS(UGameplayAbility)
 
 	friend class UAbilitySystemComponent;
 	friend class UGameplayAbilitySet;
@@ -291,7 +293,7 @@ public:
 	/** Returns the time in seconds remaining on the currently active cooldown and the original duration for this cooldown. */
 	virtual void GetCooldownTimeRemainingAndDuration(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, float& TimeRemaining, float& CooldownDuration) const;
 
-	/** Returns all tags that are currently on cooldown */
+	/** Returns all tags that can put this ability into cooldown */
 	virtual const FGameplayTagContainer* GetCooldownTags() const;
 	
 	/** Returns true if none of the ability's tags are blocked and if it doesn't have a "Blocking" tag and has all "Required" tags. */
@@ -404,6 +406,7 @@ public:
 	virtual void SetCurrentMontage(class UAnimMontage* InCurrentMontage);
 
 	/** Movement Sync */
+	UE_DEPRECATED(5.3, "This serves no purpose and will be removed in future engine versions")
 	virtual void SetMovementSyncPoint(FName SyncName);
 
 	// ----------------------------------------------------------------------------------------------------------------
@@ -500,6 +503,13 @@ public:
 	virtual int32 GetFunctionCallspace(UFunction* Function, FFrame* Stack) override;
 	virtual bool CallRemoteFunction(UFunction* Function, void* Parameters, FOutParmRec* OutParms, FFrame* Stack) override;
 	virtual bool IsSupportedForNetworking() const override;
+
+#if WITH_EDITOR
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+#endif
+
+	/** Overridden to allow Blueprint replicated properties to work */
+	virtual void GetLifetimeReplicatedProps(TArray< class FLifetimeProperty >& OutLifetimeProps) const;
 
 #if UE_WITH_IRIS
 	/** Register all replication fragments */
@@ -890,15 +900,16 @@ protected:
 	void DecrementListLock() const;
 
 public:
-	/** Setter for the bMarkPendingKillOnAbilityEnd */
-	void SetMarkPendingKillOnAbilityEnd(bool bInMarkPendingKillOnAbilityEnd) { bMarkPendingKillOnAbilityEnd = bInMarkPendingKillOnAbilityEnd; }
+	UE_DEPRECATED(5.4, "This is unsafe and unnecessary.  It is ignored.")
+	void SetMarkPendingKillOnAbilityEnd(bool bInMarkPendingKillOnAbilityEnd) {}
 
-	/** Is bMarkPendingKillOnAbilityEnd set */
-	bool IsMarkPendingKillOnAbilityEnd() const { return bMarkPendingKillOnAbilityEnd; }
+	UE_DEPRECATED(5.4, "This is unsafe and unnecessary.  It will always return false.")
+	bool IsMarkPendingKillOnAbilityEnd() const { return false; }
 
 protected:
 
 	/** Flag that is set by AbilitySystemComponent::OnRemoveAbility to indicate the ability needs to be cleaned up in AbilitySystemComponent::NotifyAbilityEnded */
-	UPROPERTY(BlueprintReadOnly, Category = Ability)
+	UE_DEPRECATED(5.4, "This is unsafe. Do not use.")
+	UPROPERTY(BlueprintReadOnly, Category = Ability, meta=(DeprecatedProperty, DeprecationMessage="This is unsafe. Do not use."))
 	bool bMarkPendingKillOnAbilityEnd;
 };

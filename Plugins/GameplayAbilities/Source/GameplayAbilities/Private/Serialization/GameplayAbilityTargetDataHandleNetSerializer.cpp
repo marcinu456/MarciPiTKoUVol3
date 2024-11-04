@@ -65,11 +65,13 @@ private:
 	class FNetSerializerRegistryDelegates final : private UE::Net::FNetSerializerRegistryDelegates
 	{
 	public:
+		FNetSerializerRegistryDelegates();
 		virtual ~FNetSerializerRegistryDelegates();
 
 	private:
 		virtual void OnPreFreezeNetSerializerRegistry() override;
 		virtual void OnPostFreezeNetSerializerRegistry() override;
+		virtual void OnLoadedModulesUpdated() override;
 	};
 
 	static FGameplayAbilityTargetDataHandleNetSerializer::FNetSerializerRegistryDelegates NetSerializerRegistryDelegates;
@@ -171,18 +173,11 @@ bool FGameplayAbilityTargetDataHandleNetSerializer::IsEqual(FNetSerializationCon
 		const SourceType& ValueB = *reinterpret_cast<const SourceType*>(Args.Source1);
 		return ValueA == ValueB;
 	}
-
-	return true;
 }
 
 bool FGameplayAbilityTargetDataHandleNetSerializer::Validate(FNetSerializationContext& Context, const FNetValidateArgs& Args)
 {
-	FQuantizedType& SourceValue = *reinterpret_cast<FQuantizedType*>(Args.Source);
-
-	// Forward
-	FNetValidateArgs InternalArgs = Args;
-	InternalArgs.Source = NetSerializerValuePointer(&SourceValue.InternalQuantizedType);
-	return InternalSerializerType::Validate(Context, InternalArgs);
+	return InternalSerializerType::Validate(Context, Args);
 }
 
 void FGameplayAbilityTargetDataHandleNetSerializer::CloneDynamicState(FNetSerializationContext& Context, const FNetCloneDynamicStateArgs& Args)
@@ -240,6 +235,11 @@ void FGameplayAbilityTargetDataHandleNetSerializer::SetArrayNum(FGameplayAbility
 static const FName PropertyNetSerializerRegistry_NAME_GameplayAbilityTargetDataHandle(TEXT("GameplayAbilityTargetDataHandle"));
 UE_NET_IMPLEMENT_NAMED_STRUCT_NETSERIALIZER_INFO(PropertyNetSerializerRegistry_NAME_GameplayAbilityTargetDataHandle, FGameplayAbilityTargetDataHandleNetSerializer);
 
+FGameplayAbilityTargetDataHandleNetSerializer::FNetSerializerRegistryDelegates::FNetSerializerRegistryDelegates()
+: UE::Net::FNetSerializerRegistryDelegates(EFlags::ShouldBindLoadedModulesUpdatedDelegate)
+{
+}
+
 FGameplayAbilityTargetDataHandleNetSerializer::FNetSerializerRegistryDelegates::~FNetSerializerRegistryDelegates()
 {
 	UE_NET_UNREGISTER_NETSERIALIZER_INFO(PropertyNetSerializerRegistry_NAME_GameplayAbilityTargetDataHandle);
@@ -253,6 +253,10 @@ void FGameplayAbilityTargetDataHandleNetSerializer::FNetSerializerRegistryDelega
 void FGameplayAbilityTargetDataHandleNetSerializer::FNetSerializerRegistryDelegates::OnPostFreezeNetSerializerRegistry()
 {
 	bIsPostFreezeCalled = true;
+}
+
+void FGameplayAbilityTargetDataHandleNetSerializer::FNetSerializerRegistryDelegates::OnLoadedModulesUpdated()
+{
 	InitGameplayAbilityTargetDataHandleNetSerializerTypeCache();
 }
 
