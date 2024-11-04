@@ -181,7 +181,7 @@ void AGameplayCueNotify_Actor::K2_EndGameplayCue()
 }
 
 int32 GameplayCueNotifyTagCheckOnRemove = 1;
-static FAutoConsoleVariableRef CVarGameplayCueNotifyActorStacking(TEXT("AbilitySystem.GameplayCueNotifyTagCheckOnRemove"), GameplayCueNotifyTagCheckOnRemove, TEXT("Check that target no longer has tag when removing GameplayCues"), ECVF_Default );
+static FAutoConsoleVariableRef CVarGameplayCueNotifyActorStacking(TEXT("AbilitySystem.GameplayCueNotifyTagCheckOnRemove"), GameplayCueNotifyTagCheckOnRemove, TEXT("Check that target no longer has tag when removing GamepalyCues"), ECVF_Default );
 
 void AGameplayCueNotify_Actor::HandleGameplayCue(AActor* MyTarget, EGameplayCueEvent::Type EventType, const FGameplayCueParameters& Parameters)
 {
@@ -351,9 +351,6 @@ bool AGameplayCueNotify_Actor::Recycle()
 	bHasHandledOnActiveEvent = false;
 	bHasHandledWhileActiveEvent = false;
 	bHasHandledOnRemoveEvent = false;
-	CueInstigator = nullptr;
-	CueSourceObject = nullptr;
-
 	ClearOwnerDestroyedDelegate();
 	if (FinishTimerHandle.IsValid())
 	{

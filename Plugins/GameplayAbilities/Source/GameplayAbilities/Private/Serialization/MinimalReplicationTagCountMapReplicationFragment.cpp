@@ -80,8 +80,6 @@ void FMinimalReplicationTagCountMapReplicationFragment::ApplyReplicatedState(FRe
 	DequantizeArgs.NetSerializerConfig = ReplicationStateDescriptor->MemberSerializerDescriptors[0].SerializerConfig;
 	const FNetSerializer* Serializer = ReplicationStateDescriptor->MemberSerializerDescriptors[0].Serializer;
 	Serializer->Dequantize(*ApplyContext.NetSerializationContext, DequantizeArgs);
-
-	MimicMinimalReplicationTagCountMapReceiveLogic(ApplyContext);
 }
 
 bool FMinimalReplicationTagCountMapReplicationFragment::PollReplicatedState(EReplicationFragmentPollFlags PollOption)
@@ -91,14 +89,10 @@ bool FMinimalReplicationTagCountMapReplicationFragment::PollReplicatedState(ERep
 		const uint8* ExternalStateBuffer = reinterpret_cast<uint8*>(Owner) + ReplicationStateDescriptor->MemberProperties[0]->GetOffset_ForGC();
 		const FMinimalReplicationTagCountMap* ExternalSourceState = reinterpret_cast<const FMinimalReplicationTagCountMap*>(ExternalStateBuffer);
 
-		void* CachedStateBuffer = SrcReplicationState->GetStateBuffer();
-		FMinimalReplicationTagCountMap* CachedState = reinterpret_cast<FMinimalReplicationTagCountMap*>(static_cast<uint8*>(CachedStateBuffer) + ReplicationStateDescriptor->MemberDescriptors[0].ExternalMemberOffset);
+		const void* CachedStateBuffer = SrcReplicationState->GetStateBuffer();
+		const FMinimalReplicationTagCountMap* CachedState = reinterpret_cast<const FMinimalReplicationTagCountMap*>(static_cast<const uint8*>(CachedStateBuffer) + ReplicationStateDescriptor->MemberDescriptors[0].ExternalMemberOffset);
 
-		if (ExternalSourceState->MapID != CachedState->MapID)
-		{
-			CachedState->MapID = ExternalSourceState->MapID;
-			return SrcReplicationState->PollPropertyReplicationState(Owner);
-		}
+		return SrcReplicationState->PollPropertyReplicationState(Owner);
 	}
 
 	return SrcReplicationState->IsDirty(0);
@@ -106,28 +100,38 @@ bool FMinimalReplicationTagCountMapReplicationFragment::PollReplicatedState(ERep
 
 void FMinimalReplicationTagCountMapReplicationFragment::CallRepNotifies(FReplicationStateApplyContext& Context)
 {
+	MimicMinimalReplicationTagCountMapReceiveLogic(Context);
 	CallRepNotify(Context);
 }
 
-void FMinimalReplicationTagCountMapReplicationFragment::MimicMinimalReplicationTagCountMapReceiveLogic(FReplicationStateApplyContext& Context) const
+void FMinimalReplicationTagCountMapReplicationFragment::MimicMinimalReplicationTagCountMapReceiveLogic(FReplicationStateApplyContext& Context)
 {
 	uint8* ExternalStatePointer = reinterpret_cast<uint8*>(Owner) + ReplicationStateDescriptor->MemberProperties[0]->GetOffset_ForGC();
 	FMinimalReplicationTagCountMap* ExternalSourceState = reinterpret_cast<FMinimalReplicationTagCountMap*>(ExternalStatePointer);
 
-	// Mark map dirty for replay
-	ExternalSourceState->MapID++;
-
-	// UpdateOwnerTagMap performs most of the logic regarding whether it should update or not and needs LastConnection to do it.
-	const uint32 ConnectionId = Context.NetSerializationContext->GetLocalConnectionId();
-	UObject* UserData = Context.NetSerializationContext->GetLocalConnectionUserData(ConnectionId);
-	ExternalSourceState->LastConnection = Cast<UNetConnection>(UserData);
-
-	const UAbilitySystemComponent* StateOwner = ExternalSourceState->Owner;
-	const bool bUpdateOwnerTagMap = StateOwner != nullptr;
-	if (bUpdateOwnerTagMap)
+	// Check whether we need to perform the complex logic or not.
+	UAbilitySystemComponent* StateOwner = ExternalSourceState->Owner;
+	bool UpdateOwnerTagMap = StateOwner != nullptr;
+	if (ExternalSourceState->bRequireNonOwningNetConnection && StateOwner)
 	{
-		ExternalSourceState->UpdateOwnerTagMap();
+		if (AActor* OwningActor = StateOwner->GetOwner())
+		{			
+			if (const UNetConnection* OwnerNetConnection = OwningActor->GetNetConnection())
+			{
+				if (OwnerNetConnection->GetConnectionId() == Context.NetSerializationContext->GetLocalConnectionId())
+				{
+					UpdateOwnerTagMap = false;
+				}
+			}
+		}
 	}
+
+	if (!UpdateOwnerTagMap)
+	{
+		return;
+	}
+
+	ExternalSourceState->UpdateOwnerTagMap();
 }
 
 void FMinimalReplicationTagCountMapReplicationFragment::CallRepNotify(FReplicationStateApplyContext& ApplyContext)

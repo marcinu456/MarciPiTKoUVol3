@@ -2,10 +2,6 @@
 
 #include "GameplayCueNotify_Burst.h"
 
-#if WITH_EDITOR
-#include "Misc/DataValidation.h"
-#endif
-
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameplayCueNotify_Burst)
 
 
@@ -37,11 +33,11 @@ bool UGameplayCueNotify_Burst::OnExecute_Implementation(AActor* Target, const FG
 }
 
 #if WITH_EDITOR
-EDataValidationResult UGameplayCueNotify_Burst::IsDataValid(FDataValidationContext& Context) const
+EDataValidationResult UGameplayCueNotify_Burst::IsDataValid(TArray<FText>& ValidationErrors)
 {
-	BurstEffects.ValidateAssociatedAssets(this, TEXT("BurstEffects"), Context);
+	BurstEffects.ValidateAssociatedAssets(this, TEXT("BurstEffects"), ValidationErrors);
 
-	return ((Context.GetNumErrors() > 0) ? EDataValidationResult::Invalid : EDataValidationResult::Valid);
+	return ((ValidationErrors.Num() > 0) ? EDataValidationResult::Invalid : EDataValidationResult::Valid);
 }
 #endif // #if WITH_EDITOR
 

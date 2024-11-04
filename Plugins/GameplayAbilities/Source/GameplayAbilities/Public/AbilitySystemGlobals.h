@@ -50,11 +50,14 @@ class GAMEPLAYABILITIES_API UAbilitySystemGlobals : public UObject
 		return *IGameplayAbilitiesModule::Get().GetAbilitySystemGlobals();
 	}
 
-	/** Will be called once on first use to load global data tables and tags (see FGameplayAbilitiesModule::GetAbilitySystemGlobals) */
+	/** Should be called once as part of project setup to load global data tables and tags */
 	virtual void InitGlobalData();
 
 	/** Returns true if InitGlobalData has been called */
-	bool IsAbilitySystemGlobalsInitialized() const;
+	bool IsAbilitySystemGlobalsInitialized()
+	{
+		return GlobalAttributeSetInitter.IsValid();
+	}
 
 	/** Returns the globally registered curve table */
 	UCurveTable* GetGlobalCurveTable();
@@ -143,12 +146,12 @@ class GAMEPLAYABILITIES_API UAbilitySystemGlobals : public UObject
 	// Cheat functions
 
 	/** Toggles whether we should ignore ability cooldowns. Does nothing in shipping builds */
-	UE_DEPRECATED(5.3, "Use CVarAbilitySystemIgnoreCooldowns")
-	virtual void ToggleIgnoreAbilitySystemCooldowns() {}
+	UFUNCTION(exec)
+	virtual void ToggleIgnoreAbilitySystemCooldowns();
 
 	/** Toggles whether we should ignore ability costs. Does nothing in shipping builds */
-	UE_DEPRECATED(5.3, "Use CVarAbilitySystemIgnoreCosts")
-	virtual void ToggleIgnoreAbilitySystemCosts() {}
+	UFUNCTION(exec)
+	virtual void ToggleIgnoreAbilitySystemCosts();
 
 	/** Returns true if ability cooldowns are ignored, returns false otherwise. Always returns false in shipping builds. */
 	bool ShouldIgnoreCooldowns() const;
@@ -157,17 +160,17 @@ class GAMEPLAYABILITIES_API UAbilitySystemGlobals : public UObject
 	bool ShouldIgnoreCosts() const;
 
 	/** Show all abilities currently assigned to the local player */
-	UE_DEPRECATED(5.3, "Use DebugAbilitySystemAbilityListGrantedCommand")
-	void ListPlayerAbilities() {}
+	UFUNCTION(exec)
+	void ListPlayerAbilities();
 	/** Force server activation of a specific player ability (useful for cheat testing) */
-	UE_DEPRECATED(5.3, "Use DebugAbilitySystemAbilityActivateCommand")
-	void ServerActivatePlayerAbility(FString AbilityNameMatch) {}
+	UFUNCTION(exec)
+	void ServerActivatePlayerAbility(FString AbilityNameMatch);
 	/** Force server deactivation of a specific player ability (useful for cheat testing) */
-	UE_DEPRECATED(5.3, "Use DebugAbilitySystemAbilityCancelCommand (EndAbility is only for internal usage)")
-	void ServerEndPlayerAbility(FString AbilityNameMatch) {}
+	UFUNCTION(exec)
+	void ServerEndPlayerAbility(FString AbilityNameMatch);
 	/** Force server cancellation of a specific player ability (useful for cheat testing) */
-	UE_DEPRECATED(5.3, "Use DebugAbilitySystemAbilityCancelCommand")
-	void ServerCancelPlayerAbility(FString AbilityNameMatch) {}
+	UFUNCTION(exec)
+	void ServerCancelPlayerAbility(FString AbilityNameMatch);
 
 	/** Called when debug strings are available, to write them to the display */
 	DECLARE_MULTICAST_DELEGATE(FOnClientServerDebugAvailable);
@@ -305,11 +308,7 @@ class GAMEPLAYABILITIES_API UAbilitySystemGlobals : public UObject
 	UPROPERTY()
 	FNetSerializeScriptStructCache	TargetDataStructCache;
 
-	UPROPERTY()
-	FNetSerializeScriptStructCache	EffectContextStructCache;
-
-	void AddAttributeDefaultTables(const FName OwnerName, const TArray<FSoftObjectPath>& AttribDefaultTableNames);
-	void RemoveAttributeDefaultTables(const FName OwnerName, const TArray<FSoftObjectPath>& AttribDefaultTableNames);
+	void AddAttributeDefaultTables(const TArray<FSoftObjectPath>& AttribDefaultTableNames);
 
 protected:
 
@@ -322,11 +321,9 @@ protected:
 	// data used for ability system cheat commands
 
 	/** If we should ignore the cooldowns when activating abilities in the ability system. Set with ToggleIgnoreAbilitySystemCooldowns() */
-	UE_DEPRECATED(5.3, "Use bIgnoreAbilitySystemCooldowns in the AbilitySystemGlobals namespace, controlled by new CVarAbilitySystemIgnoreCooldowns")
 	bool bIgnoreAbilitySystemCooldowns;
 
 	/** If we should ignore the costs when activating abilities in the ability system. Set with ToggleIgnoreAbilitySystemCosts() */
-	UE_DEPRECATED(5.3, "Use bIgnoreAbilitySystemCosts in the AbilitySystemGlobals namespace, controlled by new CVarAbilitySystemIgnoreCosts")
 	bool bIgnoreAbilitySystemCosts;
 #endif // WITH_ABILITY_CHEATS
 
@@ -387,8 +384,6 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UGameplayTagReponseTable> GameplayTagResponseTable;
 
-	bool bInitialized = false;
-
 	/** Set to true if you want clients to try to predict gameplay effects done to targets. If false it will only predict self effects */
 	UPROPERTY(config)
 	bool PredictTargetGameplayEffects;
@@ -407,12 +402,6 @@ protected:
 	/** Used to initialize attribute sets */
 	TSharedPtr<FAttributeSetInitter> GlobalAttributeSetInitter;
 
-	/** 
-	 * Curve table names to use for default values for attribute sets, keyed off of Name/Levels (with owners to allow removal of hard reference by GlobalAttributeDefaultsTables)
-	 * Required to allow unloading of plugins
-	*/
-	TMap<FSoftObjectPath, TArray<FName>> GlobalAttributeSetDefaultsTableNamesWithOwners;
-
 	template <class T>
 	T* InternalGetLoadTable(T*& Table, FString TableName);
 
@@ -421,8 +410,8 @@ protected:
 	void OnPreBeginPIE(const bool bIsSimulatingInEditor);
 #endif
 
-	static void ResetCachedData();
-	void HandlePreLoadMap(const FWorldContext& WorldContext, const FString& MapName);
+	void ResetCachedData();
+	void HandlePreLoadMap(const FString& MapName);
 
 #if WITH_EDITORONLY_DATA
 	bool RegisteredReimportCallback;

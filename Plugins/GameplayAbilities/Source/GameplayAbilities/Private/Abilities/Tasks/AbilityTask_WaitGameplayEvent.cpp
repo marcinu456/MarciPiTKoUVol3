@@ -52,8 +52,7 @@ void UAbilityTask_WaitGameplayEvent::GameplayEventContainerCallback(FGameplayTag
 {
 	if (ShouldBroadcastAbilityTaskDelegates())
 	{
-		ensureMsgf(Payload, TEXT("GameplayEventCallback expected non-null Payload"));
-		FGameplayEventData TempPayload = Payload ? *Payload : FGameplayEventData{};
+		FGameplayEventData TempPayload = *Payload;
 		TempPayload.EventTag = MatchingTag;
 		EventReceived.Broadcast(MoveTemp(TempPayload));
 	}

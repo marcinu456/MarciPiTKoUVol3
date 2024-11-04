@@ -9,43 +9,45 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AbilityTask_PlayMontageAndWait)
 
-static bool GUseAggressivePlayMontageAndWaitEndTask = true;
-static FAutoConsoleVariableRef CVarAggressivePlayMontageAndWaitEndTask(TEXT("AbilitySystem.PlayMontage.AggressiveEndTask"), GUseAggressivePlayMontageAndWaitEndTask, TEXT("This should be set to true in order to avoid multiple callbacks off an AbilityTask_PlayMontageAndWait node"));
+UAbilityTask_PlayMontageAndWait::UAbilityTask_PlayMontageAndWait(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	Rate = 1.f;
+	bStopWhenAbilityEnds = true;
+}
 
 void UAbilityTask_PlayMontageAndWait::OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted)
 {
-	const bool bPlayingThisMontage = (Montage == MontageToPlay) && Ability && Ability->GetCurrentMontage() == MontageToPlay;
-	if (bPlayingThisMontage)
+	if (Ability && Ability->GetCurrentMontage() == MontageToPlay)
 	{
-		// Reset AnimRootMotionTranslationScale
-		ACharacter* Character = Cast<ACharacter>(GetAvatarActor());
-		if (Character && (Character->GetLocalRole() == ROLE_Authority ||
-							(Character->GetLocalRole() == ROLE_AutonomousProxy && Ability->GetNetExecutionPolicy() == EGameplayAbilityNetExecutionPolicy::LocalPredicted)))
+		if (Montage == MontageToPlay)
 		{
-			Character->SetAnimRootMotionTranslationScale(1.f);
+			if (UAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
+			{
+				ASC->ClearAnimatingAbility(Ability);
+			}
+
+			// Reset AnimRootMotionTranslationScale
+			ACharacter* Character = Cast<ACharacter>(GetAvatarActor());
+			if (Character && (Character->GetLocalRole() == ROLE_Authority ||
+							  (Character->GetLocalRole() == ROLE_AutonomousProxy && Ability->GetNetExecutionPolicy() == EGameplayAbilityNetExecutionPolicy::LocalPredicted)))
+			{
+				Character->SetAnimRootMotionTranslationScale(1.f);
+			}
+
 		}
 	}
 
-	if (bPlayingThisMontage && (bInterrupted || !bAllowInterruptAfterBlendOut))
+	if (bInterrupted)
 	{
-		if (UAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
-		{
-			ASC->ClearAnimatingAbility(Ability);
-		}
-	}
-
-	if (ShouldBroadcastAbilityTaskDelegates())
-	{
-		if (bInterrupted)
+		if (ShouldBroadcastAbilityTaskDelegates())
 		{
 			OnInterrupted.Broadcast();
-
-			if (GUseAggressivePlayMontageAndWaitEndTask)
-			{
-				EndTask();
-			}
 		}
-		else
+	}
+	else
+	{
+		if (ShouldBroadcastAbilityTaskDelegates())
 		{
 			OnBlendOut.Broadcast();
 		}
@@ -54,24 +56,13 @@ void UAbilityTask_PlayMontageAndWait::OnMontageBlendingOut(UAnimMontage* Montage
 
 void UAbilityTask_PlayMontageAndWait::OnMontageInterrupted()
 {
-	// Call the new function
-	OnGameplayAbilityCancelled();
-}
-
-void UAbilityTask_PlayMontageAndWait::OnGameplayAbilityCancelled()
-{
-	if (StopPlayingMontage() || bAllowInterruptAfterBlendOut)
+	if (StopPlayingMontage())
 	{
 		// Let the BP handle the interrupt as well
 		if (ShouldBroadcastAbilityTaskDelegates())
 		{
 			OnInterrupted.Broadcast();
 		}
-	}
-
-	if (GUseAggressivePlayMontageAndWaitEndTask)
-	{
-		EndTask();
 	}
 }
 
@@ -89,7 +80,7 @@ void UAbilityTask_PlayMontageAndWait::OnMontageEnded(UAnimMontage* Montage, bool
 }
 
 UAbilityTask_PlayMontageAndWait* UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(UGameplayAbility* OwningAbility,
-	FName TaskInstanceName, UAnimMontage *MontageToPlay, float Rate, FName StartSection, bool bStopWhenAbilityEnds, float AnimRootMotionTranslationScale, float StartTimeSeconds, bool bAllowInterruptAfterBlendOut)
+	FName TaskInstanceName, UAnimMontage *MontageToPlay, float Rate, FName StartSection, bool bStopWhenAbilityEnds, float AnimRootMotionTranslationScale, float StartTimeSeconds)
 {
 
 	UAbilitySystemGlobals::NonShipping_ApplyGlobalAbilityScaler_Rate(Rate);
@@ -100,7 +91,6 @@ UAbilityTask_PlayMontageAndWait* UAbilityTask_PlayMontageAndWait::CreatePlayMont
 	MyObj->StartSection = StartSection;
 	MyObj->AnimRootMotionTranslationScale = AnimRootMotionTranslationScale;
 	MyObj->bStopWhenAbilityEnds = bStopWhenAbilityEnds;
-	MyObj->bAllowInterruptAfterBlendOut = bAllowInterruptAfterBlendOut;
 	MyObj->StartTimeSeconds = StartTimeSeconds;
 	
 	return MyObj;
@@ -129,7 +119,7 @@ void UAbilityTask_PlayMontageAndWait::Activate()
 					return;
 				}
 
-				InterruptedHandle = Ability->OnGameplayAbilityCancelled.AddUObject(this, &UAbilityTask_PlayMontageAndWait::OnGameplayAbilityCancelled);
+				InterruptedHandle = Ability->OnGameplayAbilityCancelled.AddUObject(this, &UAbilityTask_PlayMontageAndWait::OnMontageInterrupted);
 
 				BlendingOutDelegate.BindUObject(this, &UAbilityTask_PlayMontageAndWait::OnMontageBlendingOut);
 				AnimInstance->Montage_SetBlendingOutDelegate(BlendingOutDelegate, MontageToPlay);

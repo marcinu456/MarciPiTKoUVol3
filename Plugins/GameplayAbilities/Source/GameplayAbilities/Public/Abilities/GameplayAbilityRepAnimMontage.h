@@ -6,7 +6,6 @@
 #include "GameplayAbilityRepAnimMontage.generated.h"
 
 class UAnimMontage;
-class UAnimSequenceBase;
 
 /** Enum used by the Ability Rep Anim Montage struct to rep the quantized position or the current section id */
 UENUM()
@@ -22,19 +21,9 @@ struct GAMEPLAYABILITIES_API FGameplayAbilityRepAnimMontage
 {
 	GENERATED_USTRUCT_BODY()
 
-#if WITH_EDITORONLY_DATA
 	/** AnimMontage ref */
-	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Use the GetAnimMontage function instead"))
-	TObjectPtr<UAnimMontage> AnimMontage_DEPRECATED;
-#endif
-
-	/** Animation ref. When playing a dynamic montage this points to the AnimSequence the montage was created from */
 	UPROPERTY()
-	TObjectPtr<UAnimSequenceBase> Animation;
-
-	/** Optional slot name used by dynamic montages. */
-	UPROPERTY()
-	FName SlotName;
+	TObjectPtr<UAnimMontage> AnimMontage;
 
 	/** Play Rate */
 	UPROPERTY()
@@ -47,10 +36,6 @@ struct GAMEPLAYABILITIES_API FGameplayAbilityRepAnimMontage
 	/** Montage current blend time */
 	UPROPERTY()
 	float BlendTime;
-
-	/** Optional blend out used by dynamic montages. */
-	UPROPERTY(NotReplicated)
-	float BlendOutTime;
 
 	/** NextSectionID */
 	UPROPERTY()
@@ -80,16 +65,14 @@ struct GAMEPLAYABILITIES_API FGameplayAbilityRepAnimMontage
 	FPredictionKey PredictionKey;
 
 	/** The current section Id used by the montage. Will only be valid if bRepPosition is false */
-	UPROPERTY()
+	UPROPERTY(NotReplicated)
 	uint8 SectionIdToPlay;
 
 	FGameplayAbilityRepAnimMontage()
-	: Animation(nullptr),
-	SlotName(NAME_None),
+	: AnimMontage(nullptr),
 	PlayRate(0.f),
 	Position(0.f),
 	BlendTime(0.f),
-	BlendOutTime(0.f),
 	NextSectionID(0),
 	PlayInstanceId(0),
 	bRepPosition(true),
@@ -103,8 +86,6 @@ struct GAMEPLAYABILITIES_API FGameplayAbilityRepAnimMontage
 	bool NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess);
 
 	void SetRepAnimPositionMethod(ERepAnimPositionMethod InMethod);
-
-	UAnimMontage* GetAnimMontage() const;
 };
 
 template<>

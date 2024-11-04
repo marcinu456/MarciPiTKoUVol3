@@ -27,7 +27,18 @@ FActiveGameplayEffectHandle FActiveGameplayEffectHandle::GenerateNewHandle(UAbil
 	return NewHandle;
 }
 
-UAbilitySystemComponent* FActiveGameplayEffectHandle::GetOwningAbilitySystemComponent() const
+UAbilitySystemComponent* FActiveGameplayEffectHandle::GetOwningAbilitySystemComponent()
+{
+	TWeakObjectPtr<UAbilitySystemComponent>* Ptr = GlobalActiveGameplayEffectHandles::Map.Find(*this);
+	if (Ptr)
+	{
+		return Ptr->Get();
+	}
+
+	return nullptr;	
+}
+
+const UAbilitySystemComponent* FActiveGameplayEffectHandle::GetOwningAbilitySystemComponent() const
 {
 	TWeakObjectPtr<UAbilitySystemComponent>* Ptr = GlobalActiveGameplayEffectHandles::Map.Find(*this);
 	if (Ptr)

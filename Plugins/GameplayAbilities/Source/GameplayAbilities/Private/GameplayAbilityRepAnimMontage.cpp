@@ -1,24 +1,12 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Abilities/GameplayAbilityRepAnimMontage.h"
-#include "Animation/AnimMontage.h"
-#include "Animation/AnimSequenceBase.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameplayAbilityRepAnimMontage)
 
 bool FGameplayAbilityRepAnimMontage::NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
 {
 	Ar.UsingCustomVersion(FEngineNetworkCustomVersion::Guid);
-
-	uint8 bIsMontage = 1;
-	if (Ar.EngineNetVer() >= FEngineNetworkCustomVersion::DynamicMontageSerialization)
-	{
-		if (Ar.IsSaving())
-		{
-			bIsMontage = Animation && Animation->IsA<UAnimMontage>();
-		}
-		Ar.SerializeBits(&bIsMontage, 1);
-	}
 
 	uint8 RepPosition = bRepPosition;
 	Ar.SerializeBits(&RepPosition, 1);
@@ -72,24 +60,15 @@ bool FGameplayAbilityRepAnimMontage::NetSerialize(FArchive& Ar, class UPackageMa
 	Ar.SerializeBits(&SkipPlayRate, 1);
 	bSkipPlayRate = SkipPlayRate & 1;
 
-	Ar << Animation;
+	Ar << AnimMontage;
 	Ar << PlayRate;
 	Ar << BlendTime;
 	Ar << NextSectionID;
-
 	if (Ar.EngineNetVer() >= FEngineNetworkCustomVersion::MontagePlayInstIdSerialization)
 	{
 		Ar << PlayInstanceId;
 	}
-	
 	PredictionKey.NetSerialize(Ar, Map, bOutSuccess);
-
-	if (!bIsMontage)
-	{
-		ensure(Ar.EngineNetVer() >= FEngineNetworkCustomVersion::DynamicMontageSerialization);
-		Ar << BlendOutTime;
-		Ar << SlotName;
-	}
 
 	bOutSuccess = true;
 	return true;
@@ -102,9 +81,4 @@ void FGameplayAbilityRepAnimMontage::SetRepAnimPositionMethod(ERepAnimPositionMe
 	case ERepAnimPositionMethod::Position: bRepPosition = true; break;
 	case ERepAnimPositionMethod::CurrentSectionId: bRepPosition = false; break;
 	}
-}
-
-UAnimMontage* FGameplayAbilityRepAnimMontage::GetAnimMontage() const
-{
-	return Cast<UAnimMontage>(Animation);
 }

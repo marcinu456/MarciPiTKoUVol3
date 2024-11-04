@@ -135,7 +135,7 @@ void FAggregatorModChannel::RemoveModsWithActiveHandle(const FActiveGameplayEffe
 		{
 			return (Element.ActiveHandle == Handle);
 		}, 
-		EAllowShrinking::No);
+		false);
 	}
 }
 
@@ -540,7 +540,7 @@ void FAggregator::OnActiveEffectDependenciesSwapped(const TMap<FActiveGameplayEf
 
 		if (!bStillValidDependent)
 		{
-			Dependents.RemoveAtSwap(DependentIdx, 1, EAllowShrinking::No);
+			Dependents.RemoveAtSwap(DependentIdx, 1, false);
 		}
 
 		ModChannels.OnActiveEffectDependenciesSwapped(SwappedDependencies);

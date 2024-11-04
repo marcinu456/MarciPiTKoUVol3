@@ -17,5 +17,13 @@ class GAS_API UGASAbilitySystemComponent : public UAbilitySystemComponent
 	GENERATED_BODY()
 	
 public:
-	const UAttributeSet* MyGetAttributeSet(TSubclassOf<UAttributeSet> AttributeSetClass) const;
+	const UAttributeSet* UGASAbilitySystemComponent::MyGetAttributeSet(TSubclassOf<UAttributeSet> AttributeSetClass) const
+	{
+		// get the attribute set
+		const UAttributeSet* AttributeSet = GetAttributeSubobject(AttributeSetClass);
+
+		// return the pointer
+		return AttributeSet;
+	}
+	
 };

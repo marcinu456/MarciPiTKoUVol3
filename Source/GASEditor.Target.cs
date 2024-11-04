@@ -8,8 +8,8 @@ public class GASEditorTarget : TargetRules
 	public GASEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
-        DefaultBuildSettings = BuildSettingsVersion.Latest;
-        IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
+		DefaultBuildSettings = BuildSettingsVersion.V2;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
         ExtraModuleNames.Add("GAS");
 	}
 }

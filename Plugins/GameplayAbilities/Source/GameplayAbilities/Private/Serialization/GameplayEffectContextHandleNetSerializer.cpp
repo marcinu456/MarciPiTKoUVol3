@@ -36,13 +36,11 @@ private:
 	class FNetSerializerRegistryDelegates final : private UE::Net::FNetSerializerRegistryDelegates
 	{
 	public:
-		FNetSerializerRegistryDelegates();
 		virtual ~FNetSerializerRegistryDelegates();
 
 	private:
 		virtual void OnPreFreezeNetSerializerRegistry() override;
 		virtual void OnPostFreezeNetSerializerRegistry() override;
-		virtual void OnLoadedModulesUpdated() override;
 	};
 
 	static FGameplayEffectContextHandleNetSerializer::FNetSerializerRegistryDelegates NetSerializerRegistryDelegates;
@@ -68,11 +66,6 @@ void FGameplayEffectContextHandleNetSerializer::InitTypeCache()
 static const FName PropertyNetSerializerRegistry_NAME_GameplayEffectContextHandle("GameplayEffectContextHandle");
 UE_NET_IMPLEMENT_NAMED_STRUCT_NETSERIALIZER_INFO(PropertyNetSerializerRegistry_NAME_GameplayEffectContextHandle, FGameplayEffectContextHandleNetSerializer);
 
-FGameplayEffectContextHandleNetSerializer::FNetSerializerRegistryDelegates::FNetSerializerRegistryDelegates()
-: UE::Net::FNetSerializerRegistryDelegates(EFlags::ShouldBindLoadedModulesUpdatedDelegate)
-{
-}
-
 FGameplayEffectContextHandleNetSerializer::FNetSerializerRegistryDelegates::~FNetSerializerRegistryDelegates()
 {
 	UE_NET_UNREGISTER_NETSERIALIZER_INFO(PropertyNetSerializerRegistry_NAME_GameplayEffectContextHandle);
@@ -86,10 +79,6 @@ void FGameplayEffectContextHandleNetSerializer::FNetSerializerRegistryDelegates:
 void FGameplayEffectContextHandleNetSerializer::FNetSerializerRegistryDelegates::OnPostFreezeNetSerializerRegistry()
 {
 	bIsPostFreezeCalled = true;
-}
-
-void FGameplayEffectContextHandleNetSerializer::FNetSerializerRegistryDelegates::OnLoadedModulesUpdated()
-{
 	InitGameplayEffectContextHandleNetSerializerTypeCache();
 }
 

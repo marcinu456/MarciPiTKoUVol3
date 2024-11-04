@@ -73,6 +73,10 @@ void FGameplayAbilityTargetData::AddTargetDataToContext(FGameplayEffectContextHa
 	}
 }
 
+void FGameplayAbilityTargetData::AddTargetDataToGameplayCueParameters(FGameplayCueParameters& Parameters) const
+{
+}
+
 FString FGameplayAbilityTargetData::ToString() const
 {
 	return TEXT("BASE CLASS");

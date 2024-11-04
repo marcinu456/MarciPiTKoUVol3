@@ -143,13 +143,12 @@ void AGameplayCueNotify_Looping::RemoveLoopingEffects()
 }
 
 #if WITH_EDITOR
-EDataValidationResult AGameplayCueNotify_Looping::IsDataValid(FDataValidationContext& Context) const
+EDataValidationResult AGameplayCueNotify_Looping::IsDataValid(TArray<FText>& ValidationErrors)
 {
-	TArray<FText> ValidationErrors;
-	ApplicationEffects.ValidateAssociatedAssets(this, TEXT("ApplicationEffects"), Context);
-	LoopingEffects.ValidateAssociatedAssets(this, TEXT("LoopingEffects"), Context);
-	RecurringEffects.ValidateAssociatedAssets(this, TEXT("RecurringEffects"), Context);
-	RemovalEffects.ValidateAssociatedAssets(this, TEXT("RemovalEffects"), Context);
+	ApplicationEffects.ValidateAssociatedAssets(this, TEXT("ApplicationEffects"), ValidationErrors);
+	LoopingEffects.ValidateAssociatedAssets(this, TEXT("LoopingEffects"), ValidationErrors);
+	RecurringEffects.ValidateAssociatedAssets(this, TEXT("RecurringEffects"), ValidationErrors);
+	RemovalEffects.ValidateAssociatedAssets(this, TEXT("RemovalEffects"), ValidationErrors);
 
 	return ((ValidationErrors.Num() > 0) ? EDataValidationResult::Invalid : EDataValidationResult::Valid);
 }

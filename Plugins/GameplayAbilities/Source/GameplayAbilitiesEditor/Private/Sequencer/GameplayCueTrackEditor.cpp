@@ -10,9 +10,8 @@
 #include "Tracks/MovieSceneEventTrack.h"
 #include "ISequencerSection.h"
 #include "Widgets/SBoxPanel.h"
-#include "MVVM/Views/ViewUtilities.h"
+#include "SequencerUtilities.h"
 #include "MovieSceneSequenceEditor.h"
-#include "LevelSequence.h"
 
 #define LOCTEXT_NAMESPACE "FGameplayCueTrackEditor"
 
@@ -120,7 +119,13 @@ TSharedPtr<SWidget> FGameplayCueTrackEditor::BuildOutlinerEditWidget(const FGuid
 		return MenuBuilder.MakeWidget();
 	};
 
-	return UE::Sequencer::MakeAddButton(LOCTEXT("AddSection", "Section"), FOnGetContent::CreateLambda(SubMenuCallback), Params.ViewModel);
+	return SNew(SHorizontalBox)
+	+ SHorizontalBox::Slot()
+	.AutoWidth()
+	.VAlign(VAlign_Center)
+	[
+		FSequencerUtilities::MakeAddButton(LOCTEXT("AddSection", "Section"), FOnGetContent::CreateLambda(SubMenuCallback), Params.NodeIsHovered, GetSequencer())
+	];
 }
 
 void FGameplayCueTrackEditor::BuildTrackContextMenu(FMenuBuilder& MenuBuilder, UMovieSceneTrack* Track)
@@ -135,14 +140,12 @@ bool FGameplayCueTrackEditor::SupportsType(TSubclassOf<UMovieSceneTrack> Type) c
 
 bool FGameplayCueTrackEditor::SupportsSequence(UMovieSceneSequence* InSequence) const
 {
-	ETrackSupport TrackSupported = InSequence ? InSequence->IsTrackSupported(UMovieSceneGameplayCueTrack::StaticClass()) : ETrackSupport::Default;
-
-	if (TrackSupported == ETrackSupport::NotSupported)
+	if (InSequence && InSequence->IsTrackSupported(UMovieSceneGameplayCueTrack::StaticClass()) == ETrackSupport::NotSupported)
 	{
 		return false;
 	}
 
-	return (InSequence && InSequence->IsA(ULevelSequence::StaticClass())) || TrackSupported == ETrackSupport::Supported;
+	return true;
 }
 
 const FSlateBrush* FGameplayCueTrackEditor::GetIconBrush() const

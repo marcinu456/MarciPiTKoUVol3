@@ -9,12 +9,7 @@
 #include "Misc/ConfigCacheIni.h"
 #include "AbilitySystemGlobals.h"
 #include "AbilitySystemComponent.h"
-#include "Engine/NetConnection.h"
 #include "Engine/PackageMapClient.h"
-
-#if WITH_EDITOR
-#include "Misc/DataValidation.h"
-#endif
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameplayEffectTypes)
 
@@ -89,16 +84,6 @@ void FGameplayModEvaluationChannelSettings::SetEvaluationChannel(EGameplayModEva
 	{
 		Channel = NewChannel;
 	}
-}
-
-bool FGameplayModEvaluationChannelSettings::operator==(const FGameplayModEvaluationChannelSettings& Other) const
-{
-	return GetEvaluationChannel() == Other.GetEvaluationChannel();
-}
-
-bool FGameplayModEvaluationChannelSettings::operator!=(const FGameplayModEvaluationChannelSettings& Other) const
-{
-	return !(*this == Other);
 }
 
 float GameplayEffectUtilities::GetModifierBiasByModifierOp(EGameplayModOp::Type ModOp)
@@ -373,18 +358,6 @@ void FGameplayEffectContext::GetOwnedGameplayTags(OUT FGameplayTagContainer& Act
 	}
 }
 
-struct FGameplayEffectContextDeleter
-{
-	FORCEINLINE void operator()(FGameplayEffectContext* Object) const
-	{
-		check(Object);
-		UScriptStruct* ScriptStruct = Object->GetScriptStruct();
-		check(ScriptStruct);
-		ScriptStruct->DestroyStruct(Object);
-		FMemory::Free(Object);
-	}
-};
-
 bool FGameplayEffectContextHandle::NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
 {
 	bool ValidData = Data.IsValid();
@@ -392,50 +365,32 @@ bool FGameplayEffectContextHandle::NetSerialize(FArchive& Ar, class UPackageMap*
 
 	if (ValidData)
 	{
-		TCheckedObjPtr<UScriptStruct> ScriptStruct = Data.IsValid() ? Data->GetScriptStruct() : nullptr;
-		
-		UAbilitySystemGlobals::Get().EffectContextStructCache.NetSerialize(Ar, ScriptStruct.Get());
-
-		if (ScriptStruct.IsValid())
+		if (Ar.IsLoading())
 		{
-			if (Ar.IsLoading())
+			// For now, just always reset/reallocate the data when loading.
+			// Longer term if we want to generalize this and use it for property replication, we should support
+			// only reallocating when necessary
+			
+			if (Data.IsValid() == false)
 			{
-				// If data is invalid, or a different type, allocate
-				if (!Data.IsValid() || (Data->GetScriptStruct() != ScriptStruct.Get()))
-				{
-					FGameplayEffectContext* NewData = (FGameplayEffectContext*)FMemory::Malloc(ScriptStruct->GetStructureSize());
-					ScriptStruct->InitializeStruct(NewData);
-
-					Data = TSharedPtr<FGameplayEffectContext>(NewData, FGameplayEffectContextDeleter());
-				}
-			}
-
-			check(Data.IsValid());
-			if (ScriptStruct->StructFlags & STRUCT_NetSerializeNative)
-			{
-				ScriptStruct->GetCppStructOps()->NetSerialize(Ar, Map, bOutSuccess, Data.Get());
-			}
-			else
-			{
-				// This won't work since FStructProperty::NetSerializeItem is deprecrated.
-				//	1) we have to manually crawl through the topmost struct's fields since we don't have a FStructProperty for it (just the UScriptProperty)
-				//	2) if there are any UStructProperties in the topmost struct's fields, we will assert in FStructProperty::NetSerializeItem.
-
-				ABILITY_LOG(Fatal, TEXT("FGameplayEffectContextHandle::NetSerialize called on data struct %s without a native NetSerialize"), *ScriptStruct->GetName());
+				Data = TSharedPtr<FGameplayEffectContext>(UAbilitySystemGlobals::Get().AllocGameplayEffectContext());
 			}
 		}
-		else if (ScriptStruct.IsError())
+
+		UScriptStruct* ScriptStruct = Data->GetScriptStruct();
+
+		if (ScriptStruct->StructFlags & STRUCT_NetSerializeNative)
 		{
-			ABILITY_LOG(Error, TEXT("FGameplayEffectContextHandle::NetSerialize: Bad ScriptStruct serialized, can't recover."));
-			Ar.SetError();
-			Data.Reset();
-			bOutSuccess = false;
-			return false;
+			ScriptStruct->GetCppStructOps()->NetSerialize(Ar, Map, bOutSuccess, Data.Get());
 		}
-	}
-	else
-	{
-		Data.Reset();
+		else
+		{
+			// This won't work since FStructProperty::NetSerializeItem is deprecrated.
+			//	1) we have to manually crawl through the topmost struct's fields since we don't have a FStructProperty for it (just the UScriptProperty)
+			//	2) if there are any UStructProperties in the topmost struct's fields, we will assert in FStructProperty::NetSerializeItem.
+
+			ABILITY_LOG(Fatal, TEXT("FGameplayEffectContextHandle::NetSerialize called on data struct %s without a native NetSerialize"), *ScriptStruct->GetName());
+		}
 	}
 
 	bOutSuccess = true;
@@ -503,17 +458,13 @@ FOnGameplayEffectTagCountChanged& FGameplayTagCountContainer::RegisterGameplayTa
 	return Info.OnAnyChange;
 }
 
-void FGameplayTagCountContainer::Reset(bool bResetCallbacks)
+void FGameplayTagCountContainer::Reset()
 {
+	GameplayTagEventMap.Reset();
 	GameplayTagCountMap.Reset();
 	ExplicitTagCountMap.Reset();
 	ExplicitTags.Reset();
-
-	if (bResetCallbacks)
-	{
-		GameplayTagEventMap.Reset();
-		OnAnyTagChangeDelegate.Clear();
-	}
+	OnAnyTagChangeDelegate.Clear();
 }
 
 bool FGameplayTagCountContainer::UpdateExplicitTags(const FGameplayTag& Tag, const int32 CountDelta, const bool bDeferParentTagsOnRemove)
@@ -652,7 +603,7 @@ FGameplayTagBlueprintPropertyMap::~FGameplayTagBlueprintPropertyMap()
 }
 
 #if WITH_EDITOR
-EDataValidationResult FGameplayTagBlueprintPropertyMap::IsDataValid(const UObject* Owner, FDataValidationContext& Context) const
+EDataValidationResult FGameplayTagBlueprintPropertyMap::IsDataValid(UObject* Owner, TArray<FText>& ValidationErrors)
 {
 	UClass* OwnerClass = ((Owner != nullptr) ? Owner->GetClass() : nullptr);
 	if (!OwnerClass)
@@ -665,7 +616,7 @@ EDataValidationResult FGameplayTagBlueprintPropertyMap::IsDataValid(const UObjec
 	{
 		if (!Mapping.TagToMap.IsValid())
 		{
-			Context.AddError(FText::Format(LOCTEXT("GameplayTagBlueprintPropertyMap_BadTag", "The gameplay tag [{0}] for property [{1}] is empty or invalid."),
+			ValidationErrors.Add(FText::Format(LOCTEXT("GameplayTagBlueprintPropertyMap_BadTag", "The gameplay tag [{0}] for property [{1}] is empty or invalid."),
 				FText::AsCultureInvariant(Mapping.TagToMap.ToString()),
 				FText::FromName(Mapping.PropertyName)));
 		}
@@ -674,20 +625,20 @@ EDataValidationResult FGameplayTagBlueprintPropertyMap::IsDataValid(const UObjec
 		{
 			if (!IsPropertyTypeValid(Property))
 			{
-				Context.AddError(FText::Format(LOCTEXT("GameplayTagBlueprintPropertyMap_BadType", "The property [{0}] for gameplay tag [{1}] is not a supported type.  Supported types are: integer, float, and boolean."),
+				ValidationErrors.Add(FText::Format(LOCTEXT("GameplayTagBlueprintPropertyMap_BadType", "The property [{0}] for gameplay tag [{1}] is not a supported type.  Supported types are: integer, float, and boolean."),
 					FText::FromName(Mapping.PropertyName),
 					FText::AsCultureInvariant(Mapping.TagToMap.ToString())));
 			}
 		}
 		else
 		{
-			Context.AddError(FText::Format(LOCTEXT("GameplayTagBlueprintPropertyMap_MissingProperty", "The property [{0}] for gameplay tag [{1}] could not be found."),
+			ValidationErrors.Add(FText::Format(LOCTEXT("GameplayTagBlueprintPropertyMap_MissingProperty", "The property [{0}] for gameplay tag [{1}] could not be found."),
 				FText::FromName(Mapping.PropertyName),
 				FText::AsCultureInvariant(Mapping.TagToMap.ToString())));
 		}
 	}
 
-	return ((Context.GetNumErrors() > 0) ? EDataValidationResult::Invalid : EDataValidationResult::Valid);
+	return ((ValidationErrors.Num() > 0) ? EDataValidationResult::Invalid : EDataValidationResult::Valid);
 }
 #endif // #if WITH_EDITOR
 
@@ -742,7 +693,7 @@ void FGameplayTagBlueprintPropertyMap::Initialize(UObject* Owner, UAbilitySystem
 		ABILITY_LOG(Error, TEXT("FGameplayTagBlueprintPropertyMap: Removing invalid GameplayTagBlueprintPropertyMapping [Index: %d, Tag:%s, Property:%s] for [%s]."),
 			MappingIndex, *Mapping.TagToMap.ToString(), *Mapping.PropertyName.ToString(), *GetNameSafe(Owner));
 
-		PropertyMappings.RemoveAtSwap(MappingIndex, 1, EAllowShrinking::No);
+		PropertyMappings.RemoveAtSwap(MappingIndex, 1, false);
 	}
 }
 
@@ -856,16 +807,15 @@ EGameplayTagEventType::Type FGameplayTagBlueprintPropertyMap::GetGameplayTagEven
 
 bool FGameplayTagRequirements::RequirementsMet(const FGameplayTagContainer& Container) const
 {
-	const bool bHasRequired = Container.HasAll(RequireTags);
-	const bool bHasIgnored = Container.HasAny(IgnoreTags);
-	const bool bMatchQuery = TagQuery.IsEmpty() || TagQuery.Matches(Container);
+	bool HasRequired = Container.HasAll(RequireTags);
+	bool HasIgnored = Container.HasAny(IgnoreTags);
 
-	return bHasRequired && !bHasIgnored && bMatchQuery;
+	return HasRequired && !HasIgnored;
 }
 
 bool FGameplayTagRequirements::IsEmpty() const
 {
-	return (RequireTags.Num() == 0 && IgnoreTags.Num() == 0 && TagQuery.IsEmpty());
+	return (RequireTags.Num() == 0 && IgnoreTags.Num() == 0);
 }
 
 FString FGameplayTagRequirements::ToString() const
@@ -880,54 +830,8 @@ FString FGameplayTagRequirements::ToString() const
 	{
 		Str += FString::Printf(TEXT("ignore: %s "), *IgnoreTags.ToStringSimple());
 	}
-	if (!TagQuery.IsEmpty())
-	{
-		Str += TagQuery.GetDescription();
-	}
 
 	return Str;
-}
-
-bool FGameplayTagRequirements::operator==(const FGameplayTagRequirements& Other) const
-{
-	return RequireTags == Other.RequireTags && IgnoreTags == Other.IgnoreTags && TagQuery == Other.TagQuery;
-}
-
-bool FGameplayTagRequirements::operator!=(const FGameplayTagRequirements& Other) const
-{
-	return !(*this == Other);
-}
-
-FGameplayTagQuery FGameplayTagRequirements::ConvertTagFieldsToTagQuery() const
-{
-	const bool bHasRequireTags = !RequireTags.IsEmpty();
-	const bool bHasIgnoreTags = !IgnoreTags.IsEmpty();
-
-	if (!bHasIgnoreTags && !bHasRequireTags)
-	{
-		return FGameplayTagQuery{};
-	}
-
-	// FGameplayTagContainer::RequirementsMet is HasAll(RequireTags) && !HasAny(IgnoreTags);
-	FGameplayTagQueryExpression RequiredTagsQueryExpression = FGameplayTagQueryExpression().AllTagsMatch().AddTags(RequireTags);
-	FGameplayTagQueryExpression IgnoreTagsQueryExpression = FGameplayTagQueryExpression().NoTagsMatch().AddTags(IgnoreTags);
-
-	FGameplayTagQueryExpression RootQueryExpression;
-	if (bHasRequireTags && bHasIgnoreTags)
-	{
-		RootQueryExpression = FGameplayTagQueryExpression().AllExprMatch().AddExpr(RequiredTagsQueryExpression).AddExpr(IgnoreTagsQueryExpression);
-	}
-	else if (bHasRequireTags)
-	{
-		RootQueryExpression = RequiredTagsQueryExpression;
-	}
-	else // bHasIgnoreTags
-	{
-		RootQueryExpression = IgnoreTagsQueryExpression;
-	}
-
-	// Build the expression
-	return FGameplayTagQuery::BuildQuery(RootQueryExpression);
 }
 
 void FActiveGameplayEffectsContainer::PrintAllGameplayEffects() const
@@ -955,7 +859,7 @@ void FGameplayEffectSpec::PrintAll() const
 
 FString FGameplayEffectSpec::ToSimpleString() const
 {
-	return GetNameSafe(Def);
+	return FString::Printf(TEXT("%s"), *GetNameSafe(Def));
 }
 
 const FGameplayTagContainer* FTagContainerAggregator::GetAggregatedTags() const
@@ -963,9 +867,10 @@ const FGameplayTagContainer* FTagContainerAggregator::GetAggregatedTags() const
 	if (CacheIsValid == false)
 	{
 		CacheIsValid = true;
-		CachedAggregator.Reset(CapturedActorTags.Num() + CapturedSpecTags.Num());
+		CachedAggregator.Reset(CapturedActorTags.Num() + CapturedSpecTags.Num() + ScopedTags.Num());
 		CachedAggregator.AppendTags(CapturedActorTags);
 		CachedAggregator.AppendTags(CapturedSpecTags);
+		CachedAggregator.AppendTags(ScopedTags);
 	}
 
 	return &CachedAggregator;
@@ -1032,27 +937,6 @@ FGameplayCueParameters::FGameplayCueParameters(const struct FGameplayEffectConte
 , AbilityLevel(1)
 {
 	UAbilitySystemGlobals::Get().InitGameplayCueParameters(*this, InEffectContext);
-}
-
-bool FGameplayCueParameters::operator==(const FGameplayCueParameters& Other) const
-{
-	return ((NormalizedMagnitude == Other.NormalizedMagnitude) &&
-		    (RawMagnitude == Other.RawMagnitude) &&
-		    (Location == Other.Location) &&
-		    (Normal == Other.Normal) &&
-		    (GameplayEffectLevel == Other.GameplayEffectLevel) &&
-		    (AbilityLevel == Other.AbilityLevel) &&
-		    (EffectContext == Other.EffectContext) &&
-			(MatchedTagName == Other.MatchedTagName) &&
-			(OriginalTag == Other.OriginalTag) &&
-			(AggregatedSourceTags == Other.AggregatedSourceTags) &&
-			(AggregatedTargetTags == Other.AggregatedTargetTags) &&
-			(Instigator == Other.Instigator) &&
-			(EffectCauser == Other.EffectCauser) &&
-			(SourceObject == Other.SourceObject) &&
-			(PhysicalMaterial == Other.PhysicalMaterial) &&
-			(TargetAttachComponent == Other.TargetAttachComponent) &&
-			(bReplicateLocationWhenUsingMinimalRepProxy == Other.bReplicateLocationWhenUsingMinimalRepProxy));
 }
 
 bool FGameplayCueParameters::NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
@@ -1301,23 +1185,20 @@ const UObject* FGameplayCueParameters::GetSourceObject() const
 void FMinimalReplicationTagCountMap::RemoveTag(const FGameplayTag& Tag)
 {
 	MapID++;
-	if (int32* CountPtr = TagMap.Find(Tag))
+	int32& Count = TagMap.FindOrAdd(Tag);
+	Count--;
+	if (Count == 0)
 	{
-		int32& Count = *CountPtr;
-		Count--;
-		if (Count <= 0)
-		{
-			// Remove from map so that we do not replicate
-			TagMap.Remove(Tag);
-		}
+		// Remove from map so that we do not replicate
+		TagMap.Remove(Tag);
 	}
-	else
+	else if (Count < 0)
 	{
-		ABILITY_LOG(Error, TEXT("FMinimalReplicationTagCountMap::RemoveTag called on Tag %s that wasn't in the tag map."), *Tag.ToString());
+		ABILITY_LOG(Error, TEXT("FMinimalReplicationTagCountMap::RemoveTag called on Tag %s and count is now < 0"), *Tag.ToString());
+		Count = 0;
 	}
 }
 
-// WARNING: Changes to this implementation REQUIRES making sure FMinimalReplicationTagCountMapNetSerializer and FMinimalReplicationTagCountMapReplicationFragment remains compatible.
 bool FMinimalReplicationTagCountMap::NetSerialize(FArchive& Ar, class UPackageMap* Map, bool& bOutSuccess)
 {
 	const int32 CountBits = UAbilitySystemGlobals::Get().MinimalReplicationTagCountBits;
@@ -1390,12 +1271,28 @@ bool FMinimalReplicationTagCountMap::NetSerialize(FArchive& Ar, class UPackageMa
 			TagMap.FindOrAdd(Tag) = 1;
 		}
 
-		UPackageMapClient* PackageMap = CastChecked<UPackageMapClient>(Map);
-		LastConnection = PackageMap ? PackageMap->GetConnection() : nullptr;
-
 		if (Owner)
 		{
-			UpdateOwnerTagMap();
+			bool bUpdateOwnerTagMap = true;
+			if (bRequireNonOwningNetConnection)
+			{
+				if (AActor* OwningActor = Owner->GetOwner())
+				{
+					// Note we deliberately only want to do this if the NetConnection is not null
+					if (UNetConnection* OwnerNetConnection = OwningActor->GetNetConnection())
+					{
+						if (OwnerNetConnection == CastChecked<UPackageMapClient>(Map)->GetConnection())
+						{
+							bUpdateOwnerTagMap = false;
+						}
+					}
+				}
+			}
+
+			if (bUpdateOwnerTagMap)
+			{
+				UpdateOwnerTagMap();
+			}
 		}
 	}
 
@@ -1429,30 +1326,6 @@ void FMinimalReplicationTagCountMap::RemoveAllTags()
 
 void FMinimalReplicationTagCountMap::UpdateOwnerTagMap()
 {
-	bool bUpdateOwnerTagMap = true;
-	if (bRequireNonOwningNetConnection)
-	{
-		if (Owner)
-		{
-			if (AActor* OwningActor = Owner->GetOwner())
-			{
-				// Note we deliberately only want to do this if the NetConnection is not null
-				if (UNetConnection* OwnerNetConnection = OwningActor->GetNetConnection())
-				{
-					if (OwnerNetConnection == LastConnection.Get())
-					{
-						bUpdateOwnerTagMap = false;
-					}
-				}
-			}
-		}
-	}
-
-	if (!bUpdateOwnerTagMap)
-	{
-		return;
-	}
-
 	if (Owner)
 	{
 		for (auto It = TagMap.CreateIterator(); It; ++It)

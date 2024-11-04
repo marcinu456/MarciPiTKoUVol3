@@ -88,19 +88,13 @@ struct FPreallocationInfo
 
 
 /** Struct that is used by the gameplaycue manager to tie an instanced gameplaycue to the calling gamecode. Usually this is just the target actor, but can also be unique per instigator/sourceobject */
-struct UE_DEPRECATED(5.3, "Look at FGCNotifyActorKey constructor notes for upgrade steps.") FGCNotifyActorKey
+struct FGCNotifyActorKey
 {
 	FGCNotifyActorKey()
 	{
 
 	}
 
-	// This class is deprecated.  It was previously used to index into a map to find an instance of AGameplayCueNotify_Actor which was in use.
-	// Instead, you can find the AGameplayCueNotify_Actor this way:
-	//	1. InTargetActor will be its parent.  So you search InTargetActor->Children for instances of AGameplayCueNotify_Actor.
-	//	2. InCueClass can be inferred from AGameplayCueNotify_Actor->GetClass().
-	//	3. AGameplayCueNotify_Actor has two new fields: CueInstigator (corresponds to InInstigatorActor) and CueSourceObject; (corresponds to InSourceObj).
-	// Refer to UGameplayCueManager::GetInstancedCueActor.
 	FGCNotifyActorKey(AActor* InTargetActor, UClass* InCueClass, AActor* InInstigatorActor=nullptr, const UObject* InSourceObj=nullptr)
 	{
 		TargetActor = FObjectKey(InTargetActor);
@@ -123,7 +117,6 @@ struct UE_DEPRECATED(5.3, "Look at FGCNotifyActorKey constructor notes for upgra
 	}
 };
 
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
 FORCEINLINE uint32 GetTypeHash(const FGCNotifyActorKey& Key)
 {
 	return GetTypeHash(Key.TargetActor)	^
@@ -131,7 +124,6 @@ FORCEINLINE uint32 GetTypeHash(const FGCNotifyActorKey& Key)
 			GetTypeHash(Key.OptionalSourceObject) ^
 			GetTypeHash(Key.CueClass);
 }
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 /**
  *	FScopedGameplayCueSendContext

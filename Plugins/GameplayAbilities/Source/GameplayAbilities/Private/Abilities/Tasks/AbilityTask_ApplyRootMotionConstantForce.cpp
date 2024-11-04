@@ -78,6 +78,11 @@ void UAbilityTask_ApplyRootMotionConstantForce::SharedInitAndApply()
 				ConstantForce->Settings.SetFlag(ERootMotionSourceSettingsFlags::IgnoreZAccumulate);
 			}
 			RootMotionSourceID = MovementComponent->ApplyRootMotionSource(ConstantForce);
+
+			if (Ability)
+			{
+				Ability->SetMovementSyncPoint(ForceName);
+			}
 		}
 	}
 	else

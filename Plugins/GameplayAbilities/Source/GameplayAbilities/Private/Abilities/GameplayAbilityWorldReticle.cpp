@@ -1,7 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Abilities/GameplayAbilityWorldReticle.h"
-#include "Abilities/GameplayAbilityTargetActor.h"
 #include "GameFramework/PlayerController.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameplayAbilityWorldReticle)
@@ -30,7 +29,7 @@ void AGameplayAbilityWorldReticle::Tick(float DeltaTime)
 	FaceTowardSource(bFaceOwnerFlat);
 }
 
-void AGameplayAbilityWorldReticle::InitializeReticle(AGameplayAbilityTargetActor* InTargetingActor, APlayerController* PlayerController, FWorldReticleParameters InParameters)
+void AGameplayAbilityWorldReticle::InitializeReticle(AActor* InTargetingActor, APlayerController* PlayerController, FWorldReticleParameters InParameters)
 {
 	check(InTargetingActor);
 	TargetingActor = InTargetingActor;
@@ -71,18 +70,11 @@ void AGameplayAbilityWorldReticle::SetIsTargetAnActor(bool bNewValue)
 
 void AGameplayAbilityWorldReticle::FaceTowardSource(bool bFaceIn2D)
 {
-	AActor* FacingActor = TargetingActor.Get();
-
-	if (TargetingActor.Get() && TargetingActor->SourceActor)
-	{
-		FacingActor = TargetingActor->SourceActor;
-	}
-	
-	if (FacingActor)
+	if (TargetingActor)
 	{
 		if (bFaceIn2D)
 		{
-			FVector FacingVector = (FacingActor->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+			FVector FacingVector = (TargetingActor->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 			if (FacingVector.IsZero())
 			{
 				FacingVector = -GetActorForwardVector().GetSafeNormal2D();
@@ -94,7 +86,7 @@ void AGameplayAbilityWorldReticle::FaceTowardSource(bool bFaceIn2D)
 		}
 		else
 		{
-			FVector FacingVector = (FacingActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
+			FVector FacingVector = (TargetingActor->GetActorLocation() - GetActorLocation()).GetSafeNormal();
 			if (FacingVector.IsZero())
 			{
 				FacingVector = -GetActorForwardVector().GetSafeNormal();

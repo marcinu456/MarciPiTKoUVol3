@@ -73,7 +73,7 @@ FText FGameplayAbilitiesEditor::GetBaseToolkitName() const
 
 FText FGameplayAbilitiesEditor::GetToolkitName() const
 {
-	const auto& EditingObjs = GetEditingObjects();
+	const TArray<UObject*>& EditingObjs = GetEditingObjects();
 
 	check(EditingObjs.Num() > 0);
 
@@ -126,3 +126,4 @@ FString FGameplayAbilitiesEditor::GetDocumentationLink() const
 }
 
 #undef LOCTEXT_NAMESPACE
+

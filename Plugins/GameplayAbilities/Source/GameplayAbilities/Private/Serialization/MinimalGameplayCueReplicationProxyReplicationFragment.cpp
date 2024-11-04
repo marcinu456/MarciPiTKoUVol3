@@ -79,8 +79,6 @@ void FMinimalGameplayCueReplicationProxyReplicationFragment::ApplyReplicatedStat
 	DequantizeArgs.NetSerializerConfig = ReplicationStateDescriptor->MemberSerializerDescriptors[0].SerializerConfig;
 	const FNetSerializer* Serializer = ReplicationStateDescriptor->MemberSerializerDescriptors[0].Serializer;
 	Serializer->Dequantize(*ApplyContext.NetSerializationContext, DequantizeArgs);
-
-	MimicMinimalGameplayCueReplicationProxyReceiveLogic(ApplyContext);
 }
 
 bool FMinimalGameplayCueReplicationProxyReplicationFragment::PollReplicatedState(EReplicationFragmentPollFlags PollOption)
@@ -90,12 +88,11 @@ bool FMinimalGameplayCueReplicationProxyReplicationFragment::PollReplicatedState
 		const uint8* ExternalStateBuffer = reinterpret_cast<uint8*>(Owner) + ReplicationStateDescriptor->MemberProperties[0]->GetOffset_ForGC();
 		const FMinimalGameplayCueReplicationProxy* ExternalSourceState = reinterpret_cast<const FMinimalGameplayCueReplicationProxy*>(ExternalStateBuffer);
 
-		void* CachedStateBuffer = SrcReplicationState->GetStateBuffer();
-		FMinimalGameplayCueReplicationProxy* CachedState = reinterpret_cast<FMinimalGameplayCueReplicationProxy*>(static_cast<uint8*>(CachedStateBuffer) + ReplicationStateDescriptor->MemberDescriptors[0].ExternalMemberOffset);
+		const void* CachedStateBuffer = SrcReplicationState->GetStateBuffer();
+		const FMinimalGameplayCueReplicationProxy* CachedState = reinterpret_cast<const FMinimalGameplayCueReplicationProxy*>(static_cast<const uint8*>(CachedStateBuffer) + ReplicationStateDescriptor->MemberDescriptors[0].ExternalMemberOffset);
 
 		if (ExternalSourceState->LastSourceArrayReplicationKey != CachedState->LastSourceArrayReplicationKey)
 		{
-			CachedState->LastSourceArrayReplicationKey = ExternalSourceState->LastSourceArrayReplicationKey;
 			return SrcReplicationState->PollPropertyReplicationState(Owner);
 		}
 	}
@@ -105,10 +102,11 @@ bool FMinimalGameplayCueReplicationProxyReplicationFragment::PollReplicatedState
 
 void FMinimalGameplayCueReplicationProxyReplicationFragment::CallRepNotifies(FReplicationStateApplyContext& Context)
 {
+	MimicMinimalGameplayCueReplicationProxyReceiveLogic(Context);
 	CallRepNotify(Context);
 }
 
-void FMinimalGameplayCueReplicationProxyReplicationFragment::MimicMinimalGameplayCueReplicationProxyReceiveLogic(FReplicationStateApplyContext& Context) const
+void FMinimalGameplayCueReplicationProxyReplicationFragment::MimicMinimalGameplayCueReplicationProxyReceiveLogic(FReplicationStateApplyContext& Context)
 {
 	uint8* ExternalStatePointer = reinterpret_cast<uint8*>(Owner) + ReplicationStateDescriptor->MemberProperties[0]->GetOffset_ForGC();
 	FMinimalGameplayCueReplicationProxy* ExternalSourceState = reinterpret_cast<FMinimalGameplayCueReplicationProxy*>(ExternalStatePointer);
@@ -169,9 +167,6 @@ void FMinimalGameplayCueReplicationProxyReplicationFragment::MimicMinimalGamepla
 			// This is a new tag, we need to invoke the WhileActive gameplay cue event
 			StateOwner->SetTagMapCount(ReplicatedTag, 1);
 			StateOwner->InvokeGameplayCueEvent(ReplicatedTag, EGameplayCueEvent::WhileActive, Parameters);
-
-			// The demo recorder needs to believe that this structure is dirty so it will get saved into the demo stream
-			ExternalSourceState->LastSourceArrayReplicationKey++;
 		}
 	}
 

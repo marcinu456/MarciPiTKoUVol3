@@ -29,7 +29,6 @@ GAMEPLAYABILITIES_API DECLARE_LOG_CATEGORY_EXTERN(LogGameplayEffects, Display, A
 { \
 	UE_LOG(LogAbilitySystem, Verbosity, Format, ##__VA_ARGS__); \
 	UE_VLOG(Actor, VLogAbilitySystem, Verbosity, Format, ##__VA_ARGS__); \
-	static_assert(false, "ABILITY_VLOG is deprecated because the same messages do not make sense in both contexts. Use both UE_LOG and UE_VLOG"); \
 }
 
 #else
@@ -43,7 +42,6 @@ GAMEPLAYABILITIES_API DECLARE_LOG_CATEGORY_EXTERN(LogGameplayEffects, Display, A
 { \
 	UE_LOG(LogAbilitySystem, Verbosity, Format, ##__VA_ARGS__); \
 	UE_VLOG(Actor, VLogAbilitySystem, Verbosity, Format, ##__VA_ARGS__); \
-	static_assert(false, "ABILITY_VLOG is deprecated because the same messages do not make sense in both contexts. Use both UE_LOG and UE_VLOG"); \
 }
 
 #endif //NO_LOGGING

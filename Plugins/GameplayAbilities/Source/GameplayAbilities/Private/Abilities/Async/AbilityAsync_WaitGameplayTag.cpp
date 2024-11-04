@@ -1,9 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Abilities/Async/AbilityAsync_WaitGameplayTag.h"
-#include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
-#include "AbilitySystemLog.h"
+#include "AbilitySystemComponent.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AbilityAsync_WaitGameplayTag)
 
@@ -28,7 +27,6 @@ void UAbilityAsync_WaitGameplayTag::Activate()
 	}
 	else
 	{
-		ABILITY_LOG(Warning, TEXT("%s: AbilitySystemComponent is nullptr! Could not register for gameplay tag event with Tag = %s."), *GetName(), *Tag.GetTagName().ToString());
 		EndAction();
 	}
 }

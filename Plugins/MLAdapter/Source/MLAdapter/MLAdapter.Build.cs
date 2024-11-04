@@ -1,14 +1,23 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using System.IO;
+
 namespace UnrealBuildTool.Rules
 {
-	public class MLAdapter : ModuleRules
+    public class MLAdapter : ModuleRules
     {
         public MLAdapter(ReadOnlyTargetRules Target) : base(Target)
         {
             // rcplib is using exceptions so we have to enable that
             bEnableExceptions = true;
             PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+
+            PublicIncludePaths.AddRange(
+                new string[] {
+                "Runtime/AIModule/Public",
+                ModuleDirectory + "/Public",
+                }
+            );
 
             PublicDependencyModuleNames.AddRange(
                 new string[] {
@@ -22,7 +31,7 @@ namespace UnrealBuildTool.Rules
                     "Json",
                     "JsonUtilities",
                     "GameplayAbilities",
-					"NNE"
+					"NNECore"
 				}
             );
 

@@ -13,8 +13,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMontageWaitSimpleDelegate);
 UCLASS()
 class GAMEPLAYABILITIES_API UAbilityTask_PlayMontageAndWait : public UAbilityTask
 {
-	GENERATED_BODY()
-public:
+	GENERATED_UCLASS_BODY()
 
 	UPROPERTY(BlueprintAssignable)
 	FMontageWaitSimpleDelegate	OnCompleted;
@@ -31,13 +30,8 @@ public:
 	UFUNCTION()
 	void OnMontageBlendingOut(UAnimMontage* Montage, bool bInterrupted);
 
-	UE_DEPRECATED(5.3, "Please use OnGameplayAbilityCancelled instead. This function naming implied the Montage was already interrupted (instead, we are about to interrupt it).")
 	UFUNCTION()
 	void OnMontageInterrupted();
-
-	/** Callback function for when the owning Gameplay Ability is cancelled */
-	UFUNCTION()
-	void OnGameplayAbilityCancelled();
 
 	UFUNCTION()
 	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
@@ -55,12 +49,11 @@ public:
 	 * @param bStopWhenAbilityEnds If true, this montage will be aborted if the ability ends normally. It is always stopped when the ability is explicitly cancelled
 	 * @param AnimRootMotionTranslationScale Change to modify size of root motion or set to 0 to block it entirely
 	 * @param StartTimeSeconds Starting time offset in montage, this will be overridden by StartSection if that is also set
-	 * @param bAllowInterruptAfterBlendOut If true, you can receive OnInterrupted after an OnBlendOut started (otherwise OnInterrupted will not fire when interrupted, but you will not get OnComplete).
 	 */
 	UFUNCTION(BlueprintCallable, Category="Ability|Tasks", meta = (DisplayName="PlayMontageAndWait",
 		HidePin = "OwningAbility", DefaultToSelf = "OwningAbility", BlueprintInternalUseOnly = "TRUE"))
 	static UAbilityTask_PlayMontageAndWait* CreatePlayMontageAndWaitProxy(UGameplayAbility* OwningAbility,
-		FName TaskInstanceName, UAnimMontage* MontageToPlay, float Rate = 1.f, FName StartSection = NAME_None, bool bStopWhenAbilityEnds = true, float AnimRootMotionTranslationScale = 1.f, float StartTimeSeconds = 0.f, bool bAllowInterruptAfterBlendOut = false);
+		FName TaskInstanceName, UAnimMontage* MontageToPlay, float Rate = 1.f, FName StartSection = NAME_None, bool bStopWhenAbilityEnds = true, float AnimRootMotionTranslationScale = 1.f, float StartTimeSeconds = 0.f);
 
 	virtual void Activate() override;
 
@@ -97,7 +90,4 @@ protected:
 
 	UPROPERTY()
 	bool bStopWhenAbilityEnds;
-
-	UPROPERTY()
-	bool bAllowInterruptAfterBlendOut;
 };

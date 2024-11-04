@@ -293,11 +293,6 @@ void FGameplayAttribute::PostSerialize(const FArchive& Ar)
 			}
 		}
 	}
-	if (Ar.IsSaving() && IsValid())
-	{
-		// This marks the attribute "address" for later searching
-		Ar.MarkSearchableName(FGameplayAttribute::StaticStruct(), FName(FString::Printf(TEXT("%s.%s"), *GetUProperty()->GetOwnerVariant().GetName(), *GetUProperty()->GetName())));
-	}
 }
 #endif
 
@@ -404,21 +399,6 @@ bool UAttributeSet::IsSupportedForNetworking() const
 	return true;
 }
 
-void UAttributeSet::GetAttributesFromSetClass(const TSubclassOf<UAttributeSet>& AttributeSetClass, TArray<FGameplayAttribute>& Attributes)
-{
-	for (TFieldIterator<FProperty> It(AttributeSetClass); It; ++It)
-	{
-		if (FFloatProperty* FloatProperty = CastField<FFloatProperty>(*It))
-		{
-			Attributes.Add(FGameplayAttribute(FloatProperty));
-		}
-		else if (FGameplayAttribute::IsGameplayAttributeDataProperty(*It))
-		{
-			Attributes.Add(FGameplayAttribute(*It));
-		}
-	}
-}
-
 void UAttributeSet::SetNetAddressable()
 {
 	bNetAddressable = true;
@@ -428,6 +408,8 @@ void UAttributeSet::SetNetAddressable()
 void UAttributeSet::RegisterReplicationFragments(UE::Net::FFragmentRegistrationContext& Context, UE::Net::EFragmentRegistrationFlags RegistrationFlags)
 {
 	using namespace UE::Net;
+
+	Super::RegisterReplicationFragments(Context, RegistrationFlags);
 
 	// Build descriptors and allocate PropertyReplicationFragments for this object
 	FReplicationFragmentUtil::CreateAndRegisterFragmentsForObject(this, Context, RegistrationFlags);
@@ -560,7 +542,7 @@ TSubclassOf<UAttributeSet> FindBestAttributeClass(TArray<TSubclassOf<UAttributeS
  *	Each curve in the table represents a *single attribute's values for all levels*.
  *	At runtime, we want *all attribute values at given level*.
  *
- *	This code assumes that your curve data starts with a key of 1.
+ *	This code assumes that your curve data starts with a key of 1 and increases by 1 with each key.
  */
 void FAttributeSetInitterDiscreteLevels::PreloadAttributeSetData(const TArray<UCurveTable*>& CurveData)
 {
@@ -627,25 +609,46 @@ void FAttributeSetInitterDiscreteLevels::PreloadAttributeSetData(const TArray<UC
 			FName ClassFName = FName(*ClassName);
 			FAttributeSetDefaultsCollection& DefaultCollection = Defaults.FindOrAdd(ClassFName);
 
-			float FirstLevelFloat = 0.f;
-			float LastLevelFloat = 0.f;
-			Curve->GetTimeRange(FirstLevelFloat, LastLevelFloat);
-
-			int32 FirstLevel = FMath::RoundToInt32(FirstLevelFloat);
-			int32 LastLevel = FMath::RoundToInt32(LastLevelFloat);
-
-			// Only log these as warnings, as they're not deal breakers.
-			if (FirstLevel != 1)
+			// Check our curve to make sure the keys match the expected format
+			int32 ExpectedLevel = 1;
+			bool bShouldSkip = false;
+			for (auto KeyIter = Curve->GetKeyHandleIterator(); KeyIter; ++KeyIter)
 			{
-				ABILITY_LOG(Warning, TEXT("FAttributeSetInitterDiscreteLevels::PreloadAttributeSetData First level should be 1"));
+				const FKeyHandle& KeyHandle = *KeyIter;
+				if (KeyHandle == FKeyHandle::Invalid())
+				{
+					ABILITY_LOG(Verbose, TEXT("FAttributeSetInitterDiscreteLevels::PreloadAttributeSetData Data contains an invalid key handle (row: %s)"), *RowName);
+					bShouldSkip = true;
+					break;
+				}
+
+				int32 Level = Curve->GetKeyTimeValuePair(KeyHandle).Key;
+				if (ExpectedLevel != Level)
+				{
+					ABILITY_LOG(Verbose, TEXT("FAttributeSetInitterDiscreteLevels::PreloadAttributeSetData Keys are expected to start at 1 and increase by 1 for every key (row: %s)"), *RowName);
+					bShouldSkip = true;
+					break;
+				}
+
+				++ExpectedLevel;
+			}
+
+			if (bShouldSkip)
+			{
 				continue;
 			}
 
+			int32 LastLevel = Curve->GetKeyTime(Curve->GetLastKeyHandle());
 			DefaultCollection.LevelData.SetNum(FMath::Max(LastLevel, DefaultCollection.LevelData.Num()));
 
-			for (int32 Level = 1; Level <= LastLevel; ++Level)
+			//At this point we know the Name of this "class"/"group", the AttributeSet, and the Property Name. Now loop through the values on the curve to get the attribute default value at each level.
+			for (auto KeyIter = Curve->GetKeyHandleIterator(); KeyIter; ++KeyIter)
 			{
-				float Value = Curve->Eval(float(Level));
+				const FKeyHandle& KeyHandle = *KeyIter;
+
+				TPair<float, float> LevelValuePair = Curve->GetKeyTimeValuePair(KeyHandle);
+				int32 Level = LevelValuePair.Key;
+				float Value = LevelValuePair.Value;
 
 				FAttributeSetDefaults& SetDefaults = DefaultCollection.LevelData[Level-1];
 

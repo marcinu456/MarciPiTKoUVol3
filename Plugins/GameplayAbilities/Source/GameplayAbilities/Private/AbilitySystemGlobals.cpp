@@ -3,7 +3,6 @@
 #include "AbilitySystemGlobals.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "AbilitySystemStats.h"
-#include "Engine/Blueprint.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayCueInterface.h"
 #include "AbilitySystemComponent.h"
@@ -14,7 +13,6 @@
 #include "GameplayCueManager.h"
 #include "GameplayTagResponseTable.h"
 #include "GameplayTagsManager.h"
-#include "Engine/Engine.h"
 #include "UObject/UObjectIterator.h"
 
 #if UE_WITH_IRIS
@@ -28,15 +26,6 @@
 #endif
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AbilitySystemGlobals)
-
-namespace UE::AbilitySystemGlobals
-{
-	bool bIgnoreAbilitySystemCooldowns = false;
-	bool bIgnoreAbilitySystemCosts = false;
-
-	FAutoConsoleVariableRef CVarAbilitySystemIgnoreCooldowns(TEXT("AbilitySystem.IgnoreCooldowns"), bIgnoreAbilitySystemCooldowns, TEXT("Ignore cooldowns for all Gameplay Abilities."), ECVF_Cheat);
-	FAutoConsoleVariableRef CVarAbilitySystemIgnoreCosts(TEXT("AbilitySystem.IgnoreCosts"), bIgnoreAbilitySystemCosts, TEXT("Ignore costs for all Gameplay Abilities."), ECVF_Cheat);
-}
 
 UAbilitySystemGlobals::UAbilitySystemGlobals(const FObjectInitializer& ObjectInitializer)
 : Super(ObjectInitializer)
@@ -56,22 +45,15 @@ UAbilitySystemGlobals::UAbilitySystemGlobals(const FObjectInitializer& ObjectIni
 #if WITH_EDITORONLY_DATA
 	RegisteredReimportCallback = false;
 #endif // #if WITH_EDITORONLY_DATA
-}
 
-bool UAbilitySystemGlobals::IsAbilitySystemGlobalsInitialized() const
-{
-	return bInitialized;
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
+	bIgnoreAbilitySystemCooldowns = false;
+	bIgnoreAbilitySystemCosts = false;
+#endif // #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 }
 
 void UAbilitySystemGlobals::InitGlobalData()
 {
-	// Make sure the user didn't try to initialize the system again (we call InitGlobalData automatically in UE5.3+).
-	if (IsAbilitySystemGlobalsInitialized())
-	{
-		return;
-	}
-	bInitialized = true;
-
 	LLM_SCOPE(TEXT("AbilitySystem"));
 	GetGlobalCurveTable();
 	GetGlobalAttributeMetaDataTable();
@@ -85,7 +67,7 @@ void UAbilitySystemGlobals::InitGlobalData()
 	InitTargetDataScriptStructCache();
 
 	// Register for PreloadMap so cleanup can occur on map transitions
-	FCoreUObjectDelegates::PreLoadMapWithContext.AddUObject(this, &UAbilitySystemGlobals::HandlePreLoadMap);
+	FCoreUObjectDelegates::PreLoadMap.AddUObject(this, &UAbilitySystemGlobals::HandlePreLoadMap);
 
 #if WITH_EDITOR
 	// Register in editor for PreBeginPlay so cleanup can occur when we start a PIE session
@@ -282,7 +264,10 @@ UFunction* UAbilitySystemGlobals::GetGameplayCueFunction(const FGameplayTag& Chi
 void UAbilitySystemGlobals::InitTargetDataScriptStructCache()
 {
 	TargetDataStructCache.InitForType(FGameplayAbilityTargetData::StaticStruct());
-	EffectContextStructCache.InitForType(FGameplayEffectContext::StaticStruct());
+#if UE_WITH_IRIS
+	InitGameplayAbilityTargetDataHandleNetSerializerTypeCache();
+	InitGameplayEffectContextHandleNetSerializerTypeCache();
+#endif // UE_WITH_IRIS
 }
 
 // --------------------------------------------------------------------
@@ -362,62 +347,14 @@ FAttributeSetInitter* UAbilitySystemGlobals::GetAttributeSetInitter() const
 	return GlobalAttributeSetInitter.Get();
 }
 
-void UAbilitySystemGlobals::AddAttributeDefaultTables(const FName OwnerName, const TArray<FSoftObjectPath>& AttribDefaultTableNames)
+void UAbilitySystemGlobals::AddAttributeDefaultTables(const TArray<FSoftObjectPath>& AttribDefaultTableNames)
 {
 	for (const FSoftObjectPath& TableName : AttribDefaultTableNames)
 	{
-		if (TArray<FName>* Found = GlobalAttributeSetDefaultsTableNamesWithOwners.Find(TableName))
-		{
-			Found->Add(OwnerName);
-		}
-		else
-		{
-			TArray<FName> Owners = { OwnerName };
-			GlobalAttributeSetDefaultsTableNamesWithOwners.Add(TableName, MoveTemp(Owners));
-		}
+		GlobalAttributeSetDefaultsTableNames.AddUnique(TableName);
 	}
 
 	InitAttributeDefaults();
-}
-
-void UAbilitySystemGlobals::RemoveAttributeDefaultTables(const FName OwnerName, const TArray<FSoftObjectPath>& AttribDefaultTableNames)
-{
-	bool bModified = false;
-
-	for (const FSoftObjectPath& TableName : AttribDefaultTableNames)
-	{
-		if (TableName.IsValid())
-		{
-			if (TArray<FName>* Found = GlobalAttributeSetDefaultsTableNamesWithOwners.Find(TableName))
-			{
-				Found->RemoveSingle(OwnerName);
-
-				// If no references remain, clear the pointer in GlobalAttributeDefaultsTables to allow GC
-				if (Found->IsEmpty())
-				{
-					GlobalAttributeSetDefaultsTableNamesWithOwners.Remove(TableName);
-
-					// Only if not listed in config file
-					if (!GlobalAttributeSetDefaultsTableNames.Contains(TableName))
-					{
-						// Remove reference to allow GC so package can be unloaded
-						if (UCurveTable* AttribTable = Cast<UCurveTable>(TableName.ResolveObject()))
-						{
-							if (GlobalAttributeDefaultsTables.Remove(AttribTable) > 0)
-							{
-								bModified = true;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if (bModified)
-	{
-		ReloadAttributeDefaults();
-	}
 }
 
 void UAbilitySystemGlobals::InitAttributeDefaults()
@@ -449,21 +386,6 @@ void UAbilitySystemGlobals::InitAttributeDefaults()
 		}
  	}
 	
-	// Handle global curve tables for attribute defaults not defined by config file (registered by plugins or other systems calling AddAttributeDefaultTables)
-	for (const TPair<FSoftObjectPath, TArray<FName>>& It : GlobalAttributeSetDefaultsTableNamesWithOwners)
-	{
-		const FSoftObjectPath& AttribDefaultTableName = It.Key;
-		if (AttribDefaultTableName.IsValid() && !GlobalAttributeSetDefaultsTableNames.Contains(AttribDefaultTableName))
-		{
-			UCurveTable* AttribTable = Cast<UCurveTable>(AttribDefaultTableName.TryLoad());
-			if (AttribTable)
-			{
-				GlobalAttributeDefaultsTables.AddUnique(AttribTable);
-				bLoadedAnyDefaults = true;
-			}
-		}
-	}
-
 	if (bLoadedAnyDefaults)
 	{
 		// Subscribe for reimports if in the editor
@@ -551,14 +473,128 @@ void UAbilitySystemGlobals::GlobalPreGameplayEffectSpecApply(FGameplayEffectSpec
 
 }
 
+void UAbilitySystemGlobals::ToggleIgnoreAbilitySystemCooldowns()
+{
+#if WITH_ABILITY_CHEATS
+	bIgnoreAbilitySystemCooldowns = !bIgnoreAbilitySystemCooldowns;
+#endif // WITH_ABILITY_CHEATS
+}
+
+void UAbilitySystemGlobals::ToggleIgnoreAbilitySystemCosts()
+{
+#if WITH_ABILITY_CHEATS
+	bIgnoreAbilitySystemCosts = !bIgnoreAbilitySystemCosts;
+#endif // WITH_ABILITY_CHEATS
+}
+
 bool UAbilitySystemGlobals::ShouldIgnoreCooldowns() const
 {
-	return UE::AbilitySystemGlobals::bIgnoreAbilitySystemCooldowns;
+#if WITH_ABILITY_CHEATS
+	return bIgnoreAbilitySystemCooldowns;
+#else
+	return false;
+#endif // WITH_ABILITY_CHEATS
 }
 
 bool UAbilitySystemGlobals::ShouldIgnoreCosts() const
 {
-	return UE::AbilitySystemGlobals::bIgnoreAbilitySystemCosts;
+#if WITH_ABILITY_CHEATS
+	return bIgnoreAbilitySystemCosts;
+#else
+	return false;
+#endif // WITH_ABILITY_CHEATS
+}
+
+void UAbilitySystemGlobals::ListPlayerAbilities()
+{
+#if WITH_ABILITY_CHEATS	
+	APlayerController* PC = GWorld->GetFirstPlayerController();
+	UAbilitySystemComponent* AbilityComponent = PC ? GetAbilitySystemComponentFromActor(PC->GetPawn()) : nullptr;
+	if(AbilityComponent)
+	{
+		const UEnum* ExecutionEnumPtr = FindObject<UEnum>(nullptr, TEXT("/Script/GameplayAbilities.EGameplayAbilityNetExecutionPolicy"), true);
+		check(ExecutionEnumPtr && TEXT("Couldn't locate EGameplayAbilityNetExecutionPolicy enum!"));
+		const UEnum* SecurityEnumPtr = FindObject<UEnum>(nullptr, TEXT("/Script/GameplayAbilities.EGameplayAbilityNetSecurityPolicy"), true);
+		check(SecurityEnumPtr && TEXT("Couldn't locate EGameplayAbilityNetSecurityPolicy enum!"));
+
+		PC->ClientMessage(TEXT("Available abilities:"));
+
+		check(AbilityComponent && TEXT("Failed to find ability component on player pawn."));
+		for (FGameplayAbilitySpec &Activatable : AbilityComponent->GetActivatableAbilities())
+		{
+			PC->ClientMessage(FString::Printf(TEXT("   %s (%s - %s)"), *Activatable.Ability->GetName(), *ExecutionEnumPtr->GetDisplayNameTextByIndex(Activatable.Ability->GetNetExecutionPolicy()).ToString(), *SecurityEnumPtr->GetDisplayNameTextByIndex(Activatable.Ability->GetNetSecurityPolicy()).ToString()));
+		}
+	}
+#endif // WITH_ABILITY_CHEATS
+}
+
+void UAbilitySystemGlobals::ServerActivatePlayerAbility(FString AbilityNameMatch)
+{
+#if WITH_ABILITY_CHEATS
+	if (AbilityNameMatch.IsEmpty())
+	{
+		ListPlayerAbilities();
+		return;
+	}
+
+	APlayerController* PC = GWorld->GetFirstPlayerController();
+	UAbilitySystemComponent* AbilityComponent = PC ? GetAbilitySystemComponentFromActor(PC->GetPawn()) : nullptr;
+	if(AbilityComponent)
+	{
+		for (FGameplayAbilitySpec &Activatable : AbilityComponent->GetActivatableAbilities())
+		{
+			// Trigger on first match only
+			if (Activatable.Ability->GetName().Contains(AbilityNameMatch))
+			{
+				PC->ClientMessage(FString::Printf(TEXT("Triggering forced server activation of %s"), *Activatable.Ability->GetName()));
+				FPredictionKey MyKey = FPredictionKey::CreateNewPredictionKey(AbilityComponent);
+				AbilityComponent->ServerTryActivateAbility(Activatable.Handle, false, MyKey);
+				return;
+			}
+		}
+
+		PC->ClientMessage(FString::Printf(TEXT("Failed to locate any ability matching %s"), *AbilityNameMatch));
+	}
+#endif // WITH_ABILITY_CHEATS
+}
+
+#if WITH_ABILITY_CHEATS
+static void TerminatePlayerAbility(const FString &AbilityNameMatch, TFunction<FString(UAbilitySystemComponent*, FGameplayAbilitySpec&)> TerminateFn)
+{
+	APlayerController* PC = GWorld->GetFirstPlayerController();
+	UAbilitySystemComponent* AbilityComponent = PC ? UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(PC->GetPawn()) : nullptr;
+	if (AbilityComponent)
+	{
+		for (FGameplayAbilitySpec &ActivatableSpec : AbilityComponent->GetActivatableAbilities())
+		{
+			if (ActivatableSpec.Ability->IsActive() &&
+				(AbilityNameMatch.IsEmpty() || ActivatableSpec.Ability->GetName().Contains(AbilityNameMatch)))
+			{
+				PC->ClientMessage(TerminateFn(AbilityComponent, ActivatableSpec));
+			}
+		}
+	}
+}
+#endif // WITH_ABILITY_CHEATS
+
+void UAbilitySystemGlobals::ServerEndPlayerAbility(FString AbilityNameMatch)
+{
+#if WITH_ABILITY_CHEATS
+	TerminatePlayerAbility(AbilityNameMatch, [](UAbilitySystemComponent* AbilityComponent, FGameplayAbilitySpec& AbilitySpec) {
+		AbilityComponent->ServerEndAbility(AbilitySpec.Handle, AbilitySpec.Ability->GetCurrentActivationInfo(), AbilityComponent->ScopedPredictionKey);
+		return FString::Printf(TEXT("Triggering forced server ending of %s"), *AbilitySpec.Ability->GetName());
+	});
+#endif // WITH_ABILITY_CHEATS
+}
+
+void UAbilitySystemGlobals::ServerCancelPlayerAbility(FString AbilityNameMatch)
+{
+#if WITH_ABILITY_CHEATS
+	TerminatePlayerAbility(AbilityNameMatch, [](UAbilitySystemComponent* AbilityComponent, FGameplayAbilitySpec& AbilitySpec) {
+		AbilityComponent->ServerCancelAbility(AbilitySpec.Handle, AbilitySpec.Ability->GetCurrentActivationInfo());
+		return FString::Printf(TEXT("Triggering forced server cancellation of %s"), *AbilitySpec.Ability->GetName());
+	});
+#endif // WITH_ABILITY_CHEATS
 }
 
 #if WITH_EDITOR
@@ -574,29 +610,8 @@ void UAbilitySystemGlobals::ResetCachedData()
 	FActiveGameplayEffectHandle::ResetGlobalHandleMap();
 }
 
-void UAbilitySystemGlobals::HandlePreLoadMap(const FWorldContext& WorldContext, const FString& MapName)
+void UAbilitySystemGlobals::HandlePreLoadMap(const FString& MapName)
 {
-	// We don't want to reset for PIE since this is shared memory (which would have received OnPreBeginPIE).
-	if (WorldContext.PIEInstance > 0)
-	{
-		return;
-	}
-
-	// If we are preloading a map but coming from an existing map, then we should wait until the previous map is cleaned up,
-	// otherwise we'll end up stomping FActiveGameplayEffectHandle map.
-	if (const UWorld* InWorld = WorldContext.World())
-	{
-		FWorldDelegates::OnPostWorldCleanup.AddWeakLambda(InWorld, [InWorld](UWorld* WorldParam, bool bSessionEnded, bool bCleanupResources)
-			{
-				if (WorldParam == InWorld)
-				{
-					ResetCachedData();
-				}
-			});
-
-		return;
-	}
-
 	ResetCachedData();
 }
 
@@ -674,7 +689,7 @@ bool FNetSerializeScriptStructCache::NetSerialize(FArchive& Ar, UScriptStruct*& 
 			return true;
 		}
 
-		ABILITY_LOG(Error, TEXT("Could not find script struct at idx %d"), b);
+		ABILITY_LOG(Error, TEXT("Could not script struct at idx %d"), b);
 		return false;
 	}
 }

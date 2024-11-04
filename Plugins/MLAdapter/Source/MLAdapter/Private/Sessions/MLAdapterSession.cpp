@@ -424,7 +424,7 @@ void UMLAdapterSession::RemoveAgent(FMLAdapter::FAgentID AgentID)
 
 	if (Agents.Num() == AgentID)
 	{
-		Agents.Pop(EAllowShrinking::No);
+		Agents.Pop(/*bAllowShrinking=*/false);
 	}
 	else
 	{
@@ -437,7 +437,7 @@ void UMLAdapterSession::RemoveAgent(FMLAdapter::FAgentID AgentID)
 			It.RemoveCurrent();
 		}
 	}
-	AwaitingAvatar.RemoveSingleSwap(Agent, EAllowShrinking::No);
+	AwaitingAvatar.RemoveSingleSwap(Agent, /*bAllowShrinking=*/false);
 	// there should have been only one agent in AwaitingAvatar
 	ensureMsgf(AwaitingAvatar.Find(Agent) == false, TEXT("there should have been only one agent in AwaitingAvatar"));
 
@@ -489,7 +489,7 @@ bool UMLAdapterSession::RequestAvatarForAgent(UMLAdapterAgent& Agent, UWorld* In
 	if (Agent.GetAvatar() != nullptr)
 	{
 		// skipping.
-		UE_LOG(LogMLAdapter, Verbose, TEXT("UMLAdapterSession::RequestAvatarForAgent called for agent [%d] while it still has an avatar [%s]. Call ClearAvatar first to null-out agent\'s avatar."),
+		UE_LOG(LogMLAdapter, Verbose, TEXT("UMLAdapterSession::RequestAvatarForAgent called for agent [%s] while it still has an avatar [%s]. Call ClearAvatar first to null-out agent\'s avatar."),
 			Agent.GetAgentID(), *GetNameSafe(Agent.GetAvatar()));
 		return false;
 	}
@@ -546,7 +546,7 @@ void UMLAdapterSession::BindAvatar(UMLAdapterAgent& Agent, AActor& Avatar)
 	ClearAvatar(Agent);
 
 	Agent.SetAvatar(&Avatar);
-	AwaitingAvatar.RemoveSingleSwap(&Agent, EAllowShrinking::No);
+	AwaitingAvatar.RemoveSingleSwap(&Agent, /*bAllowShrinking=*/false);	
 	AvatarToAgent.Add(HashAvatar(Avatar), &Agent);
 
 	OnAgentAvatarChanged.Broadcast(Agent, OldAvatar);

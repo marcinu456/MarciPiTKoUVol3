@@ -30,16 +30,16 @@ class GAMEPLAYABILITIES_API UAbilityTask_WaitTargetData: public UAbilityTask
 	FWaitTargetDataDelegate	Cancelled;
 
 	UFUNCTION()
-	virtual void OnTargetDataReplicatedCallback(const FGameplayAbilityTargetDataHandle& Data, FGameplayTag ActivationTag);
+	void OnTargetDataReplicatedCallback(const FGameplayAbilityTargetDataHandle& Data, FGameplayTag ActivationTag);
 
 	UFUNCTION()
-	virtual void OnTargetDataReplicatedCancelledCallback();
+	void OnTargetDataReplicatedCancelledCallback();
 
 	UFUNCTION()
-	virtual void OnTargetDataReadyCallback(const FGameplayAbilityTargetDataHandle& Data);
+	void OnTargetDataReadyCallback(const FGameplayAbilityTargetDataHandle& Data);
 
 	UFUNCTION()
-	virtual void OnTargetDataCancelledCallback(const FGameplayAbilityTargetDataHandle& Data);
+	void OnTargetDataCancelledCallback(const FGameplayAbilityTargetDataHandle& Data);
 
 	/** Spawns target actor and waits for it to return valid data or to be canceled. */
 	UFUNCTION(BlueprintCallable, meta=(HidePin = "OwningAbility", DefaultToSelf = "OwningAbility", BlueprintInternalUseOnly = "true", HideSpawnParms="Instigator"), Category="Ability|Tasks")
@@ -52,10 +52,10 @@ class GAMEPLAYABILITIES_API UAbilityTask_WaitTargetData: public UAbilityTask
 	virtual void Activate() override;
 
 	UFUNCTION(BlueprintCallable, meta = (HidePin = "OwningAbility", DefaultToSelf = "OwningAbility", BlueprintInternalUseOnly = "true"), Category = "Abilities")
-	virtual bool BeginSpawningActor(UGameplayAbility* OwningAbility, TSubclassOf<AGameplayAbilityTargetActor> Class, AGameplayAbilityTargetActor*& SpawnedActor);
+	bool BeginSpawningActor(UGameplayAbility* OwningAbility, TSubclassOf<AGameplayAbilityTargetActor> Class, AGameplayAbilityTargetActor*& SpawnedActor);
 
 	UFUNCTION(BlueprintCallable, meta = (HidePin = "OwningAbility", DefaultToSelf = "OwningAbility", BlueprintInternalUseOnly = "true"), Category = "Abilities")
-	virtual void FinishSpawningActor(UGameplayAbility* OwningAbility, AGameplayAbilityTargetActor* SpawnedActor);
+	void FinishSpawningActor(UGameplayAbility* OwningAbility, AGameplayAbilityTargetActor* SpawnedActor);
 
 	/** Called when the ability is asked to confirm from an outside node. What this means depends on the individual task. By default, this does nothing other than ending if bEndTask is true. */
 	virtual void ExternalConfirm(bool bEndTask) override;
@@ -65,15 +65,15 @@ class GAMEPLAYABILITIES_API UAbilityTask_WaitTargetData: public UAbilityTask
 
 protected:
 
-	virtual bool ShouldSpawnTargetActor() const;
-	virtual void InitializeTargetActor(AGameplayAbilityTargetActor* SpawnedActor) const;
-	virtual void FinalizeTargetActor(AGameplayAbilityTargetActor* SpawnedActor) const;
+	bool ShouldSpawnTargetActor() const;
+	void InitializeTargetActor(AGameplayAbilityTargetActor* SpawnedActor) const;
+	void FinalizeTargetActor(AGameplayAbilityTargetActor* SpawnedActor) const;
 
-	virtual void RegisterTargetDataCallbacks();
+	void RegisterTargetDataCallbacks();
 
 	virtual void OnDestroy(bool AbilityEnded) override;
 
-	virtual bool ShouldReplicateDataToServer() const;
+	bool ShouldReplicateDataToServer() const;
 
 protected:
 

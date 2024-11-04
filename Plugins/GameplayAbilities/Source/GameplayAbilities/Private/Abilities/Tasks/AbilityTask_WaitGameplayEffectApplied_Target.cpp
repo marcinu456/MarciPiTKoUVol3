@@ -58,7 +58,7 @@ void UAbilityTask_WaitGameplayEffectApplied_Target::RemoveDelegate()
 	GetASC()->OnGameplayEffectAppliedDelegateToTarget.Remove(OnApplyGameplayEffectCallbackDelegateHandle);
 	if (OnPeriodicGameplayEffectExecuteCallbackDelegateHandle.IsValid())
 	{
-		GetASC()->OnPeriodicGameplayEffectExecuteDelegateOnTarget.Remove(OnPeriodicGameplayEffectExecuteCallbackDelegateHandle);
+		GetASC()->OnGameplayEffectAppliedDelegateToTarget.Remove(OnPeriodicGameplayEffectExecuteCallbackDelegateHandle);
 	}
 }
 
