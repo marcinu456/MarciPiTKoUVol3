@@ -1,7 +1,6 @@
 // Copyright The Knights of Unity. All Rights Reserved.
 
 #include "GASCharacter.h"
-#include "HeadMountedDisplayFunctionLibrary.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -154,8 +153,6 @@ void AGASCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInput
 	PlayerInputComponent->BindTouch(IE_Pressed, this, &AGASCharacter::TouchStarted);
 	PlayerInputComponent->BindTouch(IE_Released, this, &AGASCharacter::TouchStopped);
 
-	// VR headset functionality
-	PlayerInputComponent->BindAction("ResetVR", IE_Pressed, this, &AGASCharacter::OnResetVR);
 
 	if (AbilitySystemComponent && InputComponent) {
 		const FGameplayAbilityInputBinds Binds("Confirm", "Cancel", "EGASAbilityInputID", static_cast<int32>(EGASAbilityInputID::Confirm), static_cast<int32>(EGASAbilityInputID::Cancel));
@@ -163,10 +160,6 @@ void AGASCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInput
 	}
 }
 
-void AGASCharacter::OnResetVR()
-{
-	UHeadMountedDisplayFunctionLibrary::ResetOrientationAndPosition();
-}
 
 void AGASCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
